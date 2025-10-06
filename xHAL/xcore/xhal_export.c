@@ -15,11 +15,17 @@ XLOG_TAG("xExport");
 #ifdef XHAL_OS_SUPPORTING
 #include "../xos/xhal_os.h"
 
+#define XEXPORT_THREAD_OVERHEAD (160)
+
+#ifndef XEXPORT_THREAD_STACK_SIZE
+#define XEXPORT_THREAD_STACK_SIZE (1024)
+#endif
+
 static const osThreadAttr_t export_thread_attr = {
     .name       = "ThreadExport",
     .attr_bits  = osThreadDetached,
-    .priority   = osPriorityNormal,
-    .stack_size = 1024,
+    .priority   = osPriorityRealtime,
+    .stack_size = XEXPORT_THREAD_STACK_SIZE,
 };
 static void _entry_start_export(void *para);
 static void _poll_thread(void *arg);
@@ -130,7 +136,7 @@ static void _get_init_export_table(void)
     }
     count_export_init = i; /* 设置初始化导出函数计数 */
 
-    XLOG_DEBUG("Export init table : %d", count_export_init);
+    XLOG_DEBUG("Export init table: %d", count_export_init);
     XLOG_DEBUG("Export init level max: %d", export_level_max);
 }
 
@@ -172,7 +178,7 @@ static void _get_poll_export_table(void)
     }
     count_export_poll = i; /* 设置轮询导出函数计数 */
 
-    XLOG_DEBUG("Export poll table : %d", count_export_poll);
+    XLOG_DEBUG("Export poll table: %d", count_export_poll);
 }
 
 static void _export_init_func(int16_t level)
@@ -187,7 +193,7 @@ static void _export_init_func(int16_t level)
 #ifdef XHAL_UNIT_TEST
                 if (level == EXPORT_UNIT_TEST)
                 {
-                    XLOG_INFO("Export unit test : %s",
+                    XLOG_INFO("Export unit test: %s",
                               export_init_table[i].name);
                     const char *argv[] = {export_init_table[i].name, "-v"};
                     int argc           = 2;
@@ -196,7 +202,7 @@ static void _export_init_func(int16_t level)
                     continue;
                 }
 #endif
-                XLOG_INFO("Export init : %s", export_init_table[i].name);
+                XLOG_INFO("Export init: %s", export_init_table[i].name);
 
                 ((void (*)(void))export_init_table[i].func)();
             }
@@ -213,9 +219,12 @@ static void _entry_start_export(void *para)
     }
 
     _export_poll_func();
-    uint16_t perused = xmem_perused();
-    XLOG_INFO("Poll thread ended, Memory usage : %d.%d%%", perused / 10,
-              perused % 10);
+
+    uint16_t perused   = xmem_perused();
+    uint32_t free_size = xmem_free_size();
+
+    XLOG_INFO("Poll thread ended, Memory usage: %d.%d%%, Free size: %lu bytes",
+              perused / 10, perused % 10, free_size);
 
     osThreadExit();
 }
@@ -226,8 +235,8 @@ static void _poll_thread(void *arg)
     uint32_t period_ticks = XOS_MS_TO_TICKS(export->period_ms);
     uint32_t next_wake    = osKernelGetTickCount() + period_ticks;
 #ifdef XDEBUG
-    XLOG_DEBUG("Poll thread started: name=%s, period=%lu ms (%lu ticks)",
-              export->name, export->period_ms, period_ticks);
+    XLOG_DEBUG("Poll thread started: %s, period: %lu ms(%lu ticks)",
+               export->name, export->period_ms, period_ticks);
 #endif
     while (1)
     {
@@ -256,10 +265,36 @@ static void _export_poll_func(void)
     {
         osThreadAttr_t attr = {
             .name       = export_poll_table[i].name,
-            .priority   = osPriorityHigh,
+            .priority   = osPriorityNormal,
             .stack_size = 512,
         };
-        osThreadNew(_poll_thread, (void *)&export_poll_table[i], &attr);
+
+        uint32_t free_size = 0;
+
+        free_size = xmem_free_size();
+
+        if (free_size < (attr.stack_size + XEXPORT_THREAD_OVERHEAD))
+        {
+            XLOG_ERROR("Poll thread no memory: %s, free size: %lu bytes, "
+                       "required: %lu bytes (stack: %lu + overhead: %u)",
+                       export_poll_table[i].name, free_size,
+                       attr.stack_size + XEXPORT_THREAD_OVERHEAD,
+                       attr.stack_size, XEXPORT_THREAD_OVERHEAD);
+            continue;
+        }
+        osThreadId_t tid =
+            osThreadNew(_poll_thread, (void *)&export_poll_table[i], &attr);
+        if (tid == NULL)
+        {
+            XLOG_ERROR("Poll thread creation failed: %s", attr.name);
+        }
+        else
+        {
+#ifdef XDEBUG
+            XLOG_DEBUG("Poll thread created: %s, stack size: %lu bytes",
+                       attr.name, attr.stack_size);
+#endif
+        }
     }
 }
 #else

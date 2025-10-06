@@ -7,24 +7,24 @@
 #ifdef XHAL_OS_SUPPORTING
 #include "../xos/xhal_os.h"
 
-#define XHAL_ENTER_CRITICAL() osKernelLock()
-#define XHAL_EXIT_CRITICAL()  osKernelUnlock()
+#define XMALLOC_ENTER_CRITICAL() osKernelLock()
+#define XMALLOC_EXIT_CRITICAL()  osKernelUnlock()
 #else
-#define XHAL_ENTER_CRITICAL()
-#define XHAL_EXIT_CRITICAL()
+#define XMALLOC_ENTER_CRITICAL()
+#define XMALLOC_EXIT_CRITICAL()
 #endif
 
 /* mem1内存参数设定.mem1是F103内部的SRAM. */
-#ifndef MEM1_BLOCK_SIZE
-#define MEM1_BLOCK_SIZE 32 /* 内存块大小为32字节 */
+#ifndef XMALLOC_BLOCK_SIZE
+#define XMALLOC_BLOCK_SIZE 32 /* 内存块大小为32字节 */
 #endif
 
-#ifndef MEM1_MAX_SIZE
-#define MEM1_MAX_SIZE 15 * 1024 /* 最大管理内存 40K, F103内部SRAM总共512KB */
+#ifndef XMALLOC_MAX_SIZE
+#define XMALLOC_MAX_SIZE 15 * 1024 /* 最大管理内存 40K, F103内部SRAM总共512KB */
 #endif
 
 /* 内存表大小*/
-#define MEM1_ALLOC_TABLE_SIZE (MEM1_MAX_SIZE / MEM1_BLOCK_SIZE)
+#define XMALLOC_ALLOC_TABLE_SIZE (XMALLOC_MAX_SIZE / XMALLOC_BLOCK_SIZE)
 
 /* 内存管理控制器 */
 struct _m_mallco_dev
@@ -36,6 +36,7 @@ struct _m_mallco_dev
 
 extern struct _m_mallco_dev mallco_dev;
 
+uint32_t xmem_free_size(void);
 uint16_t xmem_perused(void);
 
 void xmemset(void *s, uint8_t c, uint32_t count);

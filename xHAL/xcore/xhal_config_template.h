@@ -8,13 +8,15 @@
 
 #define XOS_TICK_RATE_HZ             (1000)
 
+#define XEXPORT_THREAD_STACK_SIZE    (1024)
+
 #define XASSERT_ENABLE               (1)
 #define XASSERT_FULL_PATH_ENABLE     (1)
 
 #define XLOG_TIME_MODE               (XLOG_TIME_RELATIVE)
 
-#define MEM1_BLOCK_SIZE              (16)
-#define MEM1_MAX_SIZE                (7 * 1024)
+#define XMALLOC_BLOCK_SIZE           (16)
+#define XMALLOC_MAX_SIZE             (7 * 1024)
 
 #define XLOG_COLOR_ENABLE            (1)
 #define XLOG_NEWLINE_ENABLE          (1)

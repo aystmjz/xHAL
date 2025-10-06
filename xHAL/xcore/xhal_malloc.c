@@ -7,9 +7,9 @@
 XLOG_TAG("xMalloc");
 
 /* 内部SRAM内存池 */
-static XHAL_USED XHAL_ALIGN(64) uint8_t mem1base[MEM1_MAX_SIZE];
+static XHAL_USED XHAL_ALIGN(64) uint8_t mem1base[XMALLOC_MAX_SIZE];
 /* 内部SRAM内存池MAP */
-static uint16_t mem1mapbase[MEM1_ALLOC_TABLE_SIZE];
+static uint16_t mem1mapbase[XMALLOC_ALLOC_TABLE_SIZE];
 
 /* 内存管理控制器 */
 struct _m_mallco_dev mallco_dev = {
@@ -51,23 +51,31 @@ void xmemset(void *s, uint8_t c, uint32_t count)
         *xs++ = c;
 }
 
+uint32_t xmem_free_size(void)
+{
+    uint32_t free_blocks = 0;
+
+    XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
+    for (uint32_t i = 0; i < XMALLOC_ALLOC_TABLE_SIZE; i++)
+    {
+        if (mallco_dev.memmap[i] == 0)
+            free_blocks++;
+    }
+    XMALLOC_EXIT_CRITICAL(); /* 离开临界区 */
+
+    return (free_blocks * XMALLOC_BLOCK_SIZE);
+}
+
 /**
  * @brief  获取内存使用率
- * @param  memx : 所属内存块
  * @retval 使用率(扩大了10倍,0~1000,代表0.0%~100.0%)
  */
 uint16_t xmem_perused(void)
 {
-    uint32_t used = 0, perused = 0;
+    uint32_t perused = 0, used = 0;
 
-    XHAL_ENTER_CRITICAL(); /* 进入临界区 */
-    for (uint32_t i = 0; i < MEM1_ALLOC_TABLE_SIZE; i++)
-    {
-        if (mallco_dev.memmap[i])
-            used++;
-    }
-    XHAL_EXIT_CRITICAL(); /* 离开临界区 */
-    perused = (used * 1000) / MEM1_ALLOC_TABLE_SIZE;
+    used    = XMALLOC_MAX_SIZE - xmem_free_size();
+    perused = (used * 1000) / XMALLOC_MAX_SIZE;
 
     return perused; // 放大10倍，0~1000
 }
@@ -91,8 +99,8 @@ static uint32_t my_mem_malloc(uint32_t size)
     {
         uint8_t mttsize = sizeof(uint16_t); /* 获取memmap数组的类型长度*/
         xmemset(mallco_dev.memmap, 0,
-                MEM1_ALLOC_TABLE_SIZE * mttsize); /* 内存状态表数据清零 */
-        mallco_dev.memrdy = 1;                    /* 内存管理初始化OK */
+                XMALLOC_ALLOC_TABLE_SIZE * mttsize); /* 内存状态表数据清零 */
+        mallco_dev.memrdy = 1; /* 内存管理初始化OK */
     }
 
     if (size == 0)
@@ -100,11 +108,11 @@ static uint32_t my_mem_malloc(uint32_t size)
         return 0xFFFFFFFF; /* 不需要分配 */
     }
 
-    nmemb = size / MEM1_BLOCK_SIZE; /* 获取需要分配的连续内存块数 */
-    if (size % MEM1_BLOCK_SIZE)
+    nmemb = size / XMALLOC_BLOCK_SIZE; /* 获取需要分配的连续内存块数 */
+    if (size % XMALLOC_BLOCK_SIZE)
         nmemb++;
 
-    for (offset = MEM1_ALLOC_TABLE_SIZE - 1; offset >= 0;
+    for (offset = XMALLOC_ALLOC_TABLE_SIZE - 1; offset >= 0;
          offset--) /* 搜索整个内存控制区 */
     {
         if (!mallco_dev.memmap[offset])
@@ -116,7 +124,7 @@ static uint32_t my_mem_malloc(uint32_t size)
         {
             for (i = 0; i < nmemb; i++)
                 mallco_dev.memmap[offset + i] = nmemb;
-            return (offset * MEM1_BLOCK_SIZE); /* 返回偏移地址 */
+            return (offset * XMALLOC_BLOCK_SIZE); /* 返回偏移地址 */
         }
     }
 
@@ -139,10 +147,10 @@ static uint8_t my_mem_free(uint32_t offset)
         return 1;
     } /* 未初始化 */
 
-    if (offset < MEM1_MAX_SIZE) /* 偏移在内存池内. */
+    if (offset < XMALLOC_MAX_SIZE) /* 偏移在内存池内. */
     {
-        int index = offset / MEM1_BLOCK_SIZE; /* 偏移所在内存块号码 */
-        int nmemb = mallco_dev.memmap[index]; /* 内存块数量 */
+        int index = offset / XMALLOC_BLOCK_SIZE; /* 偏移所在内存块号码 */
+        int nmemb = mallco_dev.memmap[index];    /* 内存块数量 */
 
         for (int i = 0; i < nmemb; i++) /* 内存块清零 */
             mallco_dev.memmap[index + i] = 0;
@@ -170,9 +178,9 @@ void xfree(void *ptr)
 
     uint32_t offset = (uint32_t)ptr - (uint32_t)mallco_dev.membase;
 
-    XHAL_ENTER_CRITICAL(); /* 进入临界区 */
-    my_mem_free(offset);   /* 释放内存 */
-    XHAL_EXIT_CRITICAL();  /* 离开临界区 */
+    XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
+    my_mem_free(offset);      /* 释放内存 */
+    XMALLOC_EXIT_CRITICAL();  /* 离开临界区 */
 }
 /**
  * @brief  分配内存(外部调用)
@@ -192,9 +200,9 @@ void *xmalloc(uint32_t size)
         return NULL; /* 不需要分配 */
     }
 
-    XHAL_ENTER_CRITICAL(); /* 进入临界区 */
+    XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
     uint32_t offset = my_mem_malloc(size);
-    XHAL_EXIT_CRITICAL(); /* 离开临界区 */
+    XMALLOC_EXIT_CRITICAL(); /* 离开临界区 */
 
     if (offset == 0xFFFFFFFF)
     {
