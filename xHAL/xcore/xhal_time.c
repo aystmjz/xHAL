@@ -262,7 +262,12 @@ xhal_err_t xtime_sync_time_from_rtc(void)
 }
 /* 根据配置决定是否启用自动时间同步 */
 #if XTIME_AUTO_SYNC_ENABLE != 0
+#ifdef XHAL_OS_SUPPORTING
+POLL_EXPORT_OS(xtime_sync_time_from_rtc, XTIME_AUTO_SYNC_TIME, osPriorityHigh,
+               512);
+#else
 POLL_EXPORT(xtime_sync_time_from_rtc, XTIME_AUTO_SYNC_TIME);
+#endif
 #endif
 
 /**

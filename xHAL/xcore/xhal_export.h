@@ -4,6 +4,9 @@
 #include "xhal_config.h"
 #include "xhal_def.h"
 #include "xhal_std.h"
+#ifdef XHAL_OS_SUPPORTING
+#include "../xos/xhal_os.h"
+#endif
 
 #define EXPORT_ID_INIT (0xabababab)
 #define EXPORT_ID_POLL (0xcdcdcdcd)
@@ -38,6 +41,10 @@ typedef struct xhal_export
     uint8_t exit;        /* 退出标志 */
     int16_t level;       /* 导出级别 */
     uint32_t period_ms;  /* 轮询周期 */
+#ifdef XHAL_OS_SUPPORTING
+    osPriority_t priority;
+    uint32_t stack_size;
+#endif
     uint32_t magic_tail; /* 尾部魔数 */
 } xhal_export_t;
 
@@ -108,5 +115,27 @@ void xhal_run(void);
         .magic_head = EXPORT_ID_POLL,                        \
         .magic_tail = EXPORT_ID_POLL,                        \
     }
+
+#ifdef XHAL_OS_SUPPORTING
+#define POLL_EXPORT_OS(_func, _period_ms, _priority, _stack_size) \
+    static xhal_export_poll_data_t poll_##_func##_data = {        \
+        .timeout_ms = 0,                                          \
+    };                                                            \
+    XHAL_USED const xhal_export_t poll_##_func XHAL_SECTION(      \
+        ".xhal_poll_export") = {                                  \
+        .name       = #_func,                                     \
+        .func       = (void *)&_func,                             \
+        .data       = (void *)&poll_##_func##_data,               \
+        .level      = (int16_t)(EXPORT_POLL),                     \
+        .period_ms  = (uint32_t)(_period_ms),                     \
+        .priority   = (osPriority_t)(_priority),                  \
+        .stack_size = (uint32_t)(_stack_size),                    \
+        .magic_head = EXPORT_ID_POLL,                             \
+        .magic_tail = EXPORT_ID_POLL,                             \
+    }
+#else
+#define POLL_EXPORT_OS(_func, _period_ms, _priority, _stack_size) \
+    POLL_EXPORT(_func, _period_ms)
+#endif /* XHAL_OS_SUPPORTING */
 
 #endif /* __XHAL_EXPORT_H */

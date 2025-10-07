@@ -15,7 +15,9 @@ XLOG_TAG("xExport");
 #ifdef XHAL_OS_SUPPORTING
 #include "../xos/xhal_os.h"
 
-#define XEXPORT_THREAD_OVERHEAD (160)
+#define XEXPORT_THREAD_OVERHEAD    (160)
+#define XEXPORT_DEFAULT_STACK_SIZE (512)
+#define XEXPORT_DEFAULT_PRIORITY   (osPriorityNormal)
 
 #ifndef XEXPORT_THREAD_STACK_SIZE
 #define XEXPORT_THREAD_STACK_SIZE (1024)
@@ -264,10 +266,27 @@ static void _export_poll_func(void)
     for (uint32_t i = 0; i < count_export_poll; i++)
     {
         osThreadAttr_t attr = {
-            .name       = export_poll_table[i].name,
-            .priority   = osPriorityNormal,
-            .stack_size = 512,
+            .attr_bits = osThreadDetached,
+            .name      = export_poll_table[i].name,
         };
+
+        if (export_poll_table[i].priority != osPriorityNone)
+        {
+            attr.priority = export_poll_table[i].priority;
+        }
+        else
+        {
+            attr.priority = XEXPORT_DEFAULT_PRIORITY;
+        }
+
+        if (export_poll_table[i].stack_size != 0)
+        {
+            attr.stack_size = export_poll_table[i].stack_size;
+        }
+        else
+        {
+            attr.stack_size = (uint32_t)XEXPORT_DEFAULT_STACK_SIZE;
+        }
 
         uint32_t free_size = 0;
 
