@@ -3,7 +3,8 @@
 
 #include "xhal_std.h"
 
-#define XHAL_NAME_SIZE (32)
+#define XHAL_NAME_SIZE    (32)
+#define XHAL_WAIT_FOREVER (0xFFFFFFFFU)
 
 typedef enum xhal_err
 {
@@ -22,7 +23,6 @@ typedef enum xhal_err
     XHAL_ERR_NO_SYSTEM  = -12, /* 系统错误，系统资源不可用 */
     XHAL_ERR_BUS        = -13, /* 总线错误，硬件总线通信失败 */
 } xhal_err_t;
-
 
 #if defined(__linux__)
 #define XHAL_STR_ENTER "\n"

@@ -6,11 +6,12 @@
 
 typedef struct xhal_serial xhal_serial_t;
 
-#define XSERIAL_EVENT_CAN_READ   (1U << 0) // 有数据可读
-#define XSERIAL_EVENT_CAN_WRITE  (1U << 1) // 数据发送完成，可继续写入
+#define XSERIAL_EVENT_CAN_READ      (1U << 0) /* 有数据可读 */
+#define XSERIAL_EVENT_CAN_WRITE     (1U << 1) /* 数据发送完成，可继续写入 */
 
-#define XSERIAL_RX_BUFSZ_DEFAULT 256
-#define XSERIAL_TX_BUFSZ_DEFAULT 256
+#define XSERIAL_TERM_SCANF_BUF_SIZE 128
+#define XSERIAL_PRINTF_BUF_SIZE     128
+
 #define XSERIAL_ATTR_DEFAULT                     \
     {                                            \
         115200,              /* 115200 bits/s */ \
@@ -50,10 +51,10 @@ typedef struct xhal_serial_attr
 
 typedef struct
 {
-    uint32_t rx_full; // 已接收但未读取的字节数
-    uint32_t rx_free; // 接收缓冲剩余空间
-    uint32_t tx_full; // 发送缓冲中未发送的字节数
-    uint32_t tx_free; // 发送缓冲剩余空间
+    uint32_t rx_full; /* 已接收但未读取的字节数 */
+    uint32_t rx_free; /* 接收缓冲剩余空间 */
+    uint32_t tx_full; /* 发送缓冲中未发送的字节数 */
+    uint32_t tx_free; /* 发送缓冲剩余空间 */
 } xserial_status_t;
 
 typedef struct xhal_serial_ops
@@ -94,10 +95,12 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
                         const xhal_serial_attr_t *attr, void *tx_buff,
                         void *rx_buff, uint32_t tx_bufsz, uint32_t rx_bufsz);
 
+uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...);
 uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size);
 uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
                                uint32_t size, uint32_t timeout_ms);
 
+uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...);
 uint32_t xserial_read(xhal_periph_t *self, void *buff, uint32_t size);
 uint32_t xserial_read_timeout(xhal_periph_t *self, void *buf, uint32_t size,
                               uint32_t timeout_ms);
@@ -107,6 +110,8 @@ uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
 uint32_t xserial_discard(xhal_periph_t *self, uint32_t size);
 uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
                      uint32_t offset, uint32_t *index);
+
+uint32_t xserial_term_scanf(xhal_periph_t *self, const char *fmt, ...);
 
 xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status);
 xhal_err_t xserial_get_attr(xhal_periph_t *self, xhal_serial_attr_t *attr);
