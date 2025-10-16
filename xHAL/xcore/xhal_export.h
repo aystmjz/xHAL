@@ -1,12 +1,10 @@
 #ifndef __XHAL_EXPORT_H
 #define __XHAL_EXPORT_H
 
+#include "../xos/xhal_os.h"
 #include "xhal_config.h"
 #include "xhal_def.h"
 #include "xhal_std.h"
-#ifdef XHAL_OS_SUPPORTING
-#include "../xos/xhal_os.h"
-#endif
 
 #define EXPORT_ID_INIT (0xabababab)
 #define EXPORT_ID_POLL (0xcdcdcdcd)

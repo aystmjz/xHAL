@@ -6,8 +6,6 @@
 #include "xhal_std.h"
 #include <time.h>
 
-#define XTIME_DELAY_US_SUPPORTING
-
 typedef uint64_t xhal_tick_ms_t;  // Tick 类型，毫秒
 typedef uint32_t xhal_tick_sec_t; // Tick 类型，秒
 typedef time_t xhal_ts_t;         // 时间戳类型，绝对时间

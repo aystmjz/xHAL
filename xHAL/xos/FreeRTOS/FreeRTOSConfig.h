@@ -6,6 +6,7 @@
 #include "xhal_log.h"
 #include "xhal_malloc.h"
 #include "xhal_std.h"
+#include XHAL_CMSIS_DEVICE_HEADER
 
 extern uint32_t SystemCoreClock;
 inline void *_xmalloc(uint32_t size);
@@ -212,15 +213,15 @@ inline void *_xmalloc(uint32_t size);
 #else
 #define configPRIO_BITS 4
 #endif
+
 // 中断最低优先级
 #define configLIBRARY_LOWEST_INTERRUPT_PRIORITY      15
 
 // 系统可管理的最高中断优先级
-#define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 5
+#define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 4
 
-#define configKERNEL_INTERRUPT_PRIORITY                                       \
-    (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS)) /* 240 \
-                                                                        */
+#define configKERNEL_INTERRUPT_PRIORITY \
+    (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY \
     (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))

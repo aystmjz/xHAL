@@ -2,10 +2,8 @@
 #define __XHAL_PERIPH_H
 
 #include "../xcore/xhal_def.h"
-#include "xhal_config.h"
-#ifdef XHAL_OS_SUPPORTING
 #include "../xos/xhal_os.h"
-#endif
+#include "xhal_config.h"
 
 #define XPERIPH_INITED     1
 #define XPERIPH_NOT_INITED 0
@@ -60,6 +58,9 @@ typedef struct xhal_periph
             return _return;                                       \
         }                                                         \
     } while (0)
+
+#define XPERIPH_CHECK_TYPE(_peri, _type) \
+    xassert_name(_peri->attr.type == _type, _peri->attr.name)
 
 void xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr);
 void xperiph_unregister(xhal_periph_t *self);

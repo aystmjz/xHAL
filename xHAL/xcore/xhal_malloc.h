@@ -40,7 +40,7 @@ uint32_t xmem_free_size(void);
 uint16_t xmem_perused(void);
 
 void xmemset(void *s, uint8_t c, uint32_t count);
-void xmemcpy(void *des, void *src, uint32_t n);
+void xmemcpy(void *des, const void *src, uint32_t n);
 
 void xfree(void *ptr);
 void *xmalloc(uint32_t size);

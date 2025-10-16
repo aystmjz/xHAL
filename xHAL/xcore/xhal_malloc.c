@@ -25,13 +25,13 @@ struct _m_mallco_dev mallco_dev = {
  * @param  n    : 需要复制的内存长度(字节为单位)
  * @retval 无
  */
-void xmemcpy(void *des, void *src, uint32_t n)
+void xmemcpy(void *des, const void *src, uint32_t n)
 {
     xassert_not_null(des);
     xassert_not_null(src);
 
-    uint8_t *xdes = des;
-    uint8_t *xsrc = src;
+    uint8_t *xdes = (uint8_t *)des;
+    uint8_t *xsrc = (uint8_t *)src;
     while (n--)
         *xdes++ = *xsrc++;
 }
