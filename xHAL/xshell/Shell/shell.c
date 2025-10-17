@@ -134,9 +134,9 @@ static const char *shellText[] =
     [SHELL_TEXT_INFO] =
     	"\r\n"
         "eLab project\r\n"
-        "Build:       By GouGe on "__DATE__" "__TIME__"\r\n"
+        "Build:       By aystmjz on "__DATE__" "__TIME__"\r\n"
         "Version:     "SHELL_VERSION"\r\n"
-        "Copyright:   (c) 2025 eLab Team\r\n",
+        "Copyright:   (c) 2025 xHAL Team\r\n",
 #endif
     [SHELL_TEXT_CMD_TOO_LONG] = 
         "\r\nWarning: Command is too long\r\n",
@@ -1199,7 +1199,7 @@ int shellSetVar(char *name, int value)
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC)|SHELL_CMD_DISABLE_RETURN,
-setVar, shellSetVar, set var);
+setVar, shellSetVar, "set var");
 
 
 /**
@@ -1474,7 +1474,7 @@ void shellUp(Shell *shell)
 {
     shellHistory(shell, 1);
 }
-SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), ESH_KEY_UP, shellUp, up);
+SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), ESH_KEY_UP, shellUp, "up");
 
 /**
  * @brief shell下方向键输入
@@ -1485,7 +1485,7 @@ void shellDown(Shell *shell)
 {
     shellHistory(shell, -1);
 }
-SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), ESH_KEY_DOWN, shellDown, down);
+SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), ESH_KEY_DOWN, shellDown, "down");
 #endif /** SHELL_HISTORY_MAX_NUMBER > 0 */
 
 
@@ -1502,7 +1502,7 @@ void shellRight(Shell *shell)
     }
 }
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x1B5B4300, shellRight, right);
+0x1B5B4300, shellRight, "right");
 
 
 /**
@@ -1519,7 +1519,7 @@ void shellLeft(Shell *shell)
     }
 }
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x1B5B4400, shellLeft, left);
+0x1B5B4400, shellLeft, "left");
 
 
 /**
@@ -1621,7 +1621,7 @@ void shellTab(Shell *shell)
         }
     }
 }
-SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), 0x09000000, shellTab, tab);
+SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), 0x09000000, shellTab, "tab");
 
 
 /**
@@ -1634,9 +1634,9 @@ void shellBackspace(Shell *shell)
     shellDeleteByte(shell, 1);
 }
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x08000000, shellBackspace, backspace);
+0x08000000, shellBackspace, "backspace");
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x7F000000, shellBackspace, backspace);
+0x7F000000, shellBackspace, "backspace");
 
 
 /**
@@ -1649,7 +1649,7 @@ void shellDelete(Shell *shell)
     shellDeleteByte(shell, -1);
 }
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x1B5B337E, shellDelete, delete);
+0x1B5B337E, shellDelete, "delete");
 
 
 /**
@@ -1664,15 +1664,15 @@ void shellEnter(Shell *shell)
 }
 #if SHELL_ENTER_LF == 1
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x0A000000, shellEnter, enter);
+0x0A000000, shellEnter, "enter");
 #endif
 #if SHELL_ENTER_CR == 1
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x0D000000, shellEnter, enter);
+0x0D000000, shellEnter, "enter");
 #endif
 #if SHELL_ENTER_CRLF == 1
 SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0)|SHELL_CMD_ENABLE_UNCHECKED,
-0x0D0A0000, shellEnter, enter);
+0x0D0A0000, shellEnter, "enter");
 #endif
 
 /**
@@ -1723,7 +1723,7 @@ int shellHelp(int argc, char *argv[])
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN)|SHELL_CMD_DISABLE_RETURN,
-help, shellHelp, show command info\r\nhelp [cmd]);
+help, shellHelp, "show command info\r\nhelp [cmd]");
 
 /**
  * @brief shell 输入处理
@@ -1876,7 +1876,7 @@ int shellUsers(void)
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC)|SHELL_CMD_DISABLE_RETURN,
-users, shellUsers, list all user);
+users, shellUsers, "list all user");
 
 
 /**
@@ -1894,7 +1894,7 @@ int shellCmds(void)
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC)|SHELL_CMD_DISABLE_RETURN,
-cmds, shellCmds, list all cmd);
+cmds, shellCmds, "list all cmd");
 
 
 /**
@@ -1911,7 +1911,7 @@ int shellVars(void)
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC)|SHELL_CMD_DISABLE_RETURN,
-vars, shellVars, list all var);
+vars, shellVars, "list all var");
 
 
 /**
@@ -1928,7 +1928,7 @@ int shellKeys(void)
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC)|SHELL_CMD_DISABLE_RETURN,
-keys, shellKeys, list all key);
+keys, shellKeys, "list all key");
 
 
 /**
@@ -1945,13 +1945,13 @@ int shellClear(void)
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC)|SHELL_CMD_DISABLE_RETURN,
-clear, shellClear, clear console);
+clear, shellClear, "clear console");
 
 static void fkey_null_func(Shell *shell)
 {
     (void)shell;
 }
-SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), 0x7E000000, fkey_null_func, fkey_tail);
+SHELL_EXPORT_KEY(SHELL_CMD_PERMISSION(0), 0x7E000000, fkey_null_func, "fkey_tail");
 
 /**
  * @brief shell执行命令
@@ -2008,5 +2008,5 @@ int shellExecute(int argc, char *argv[])
 }
 SHELL_EXPORT_CMD(
 SHELL_CMD_PERMISSION(0)|SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN)|SHELL_CMD_DISABLE_RETURN,
-exec, shellExecute, execute function undefined);
+exec, shellExecute, "execute function undefined");
 #endif

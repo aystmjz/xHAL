@@ -9,18 +9,17 @@
 #define EXPORT_ID_INIT (0xabababab)
 #define EXPORT_ID_POLL (0xcdcdcdcd)
 
-enum xhal_export_level
+typedef enum xport_level
 {
-    EXPORT_POLL                 = -2,
-    EXPORT_UNIT_TEST            = -1,
-    EXPORT_LEVEL_BSP            = 0,
-    EXPORT_LEVEL_HW_INDEPNEDENT = 0,
-    EXPORT_DRVIVER              = 1,
-    EXPORT_MIDWARE              = 2,
-    EXPORT_PERIPH               = 3,
-    EXPORT_APP                  = 4,
-    EXPORT_USER                 = 5,
-};
+    EXPORT_LEVEL_POLL    = -2,
+    EXPORT_LEVEL_TEST    = -1,
+    EXPORT_LEVEL_CORE    = 0,
+    EXPORT_LEVEL_PERIPH  = 1,
+    EXPORT_LEVEL_DRIVER  = 2,
+    EXPORT_LEVEL_MIDWARE = 3,
+    EXPORT_LEVEL_APP     = 4,
+    EXPORT_LEVEL_USER    = 5,
+} xport_level_t;
 
 /* 轮询导出数据结构 */
 typedef struct xhal_export_poll_data
@@ -88,7 +87,7 @@ void xhal_run(void);
  * @retval 无
  */
 #ifdef XHAL_UNIT_TEST
-#define UNIT_TEST_EXPORT(_func) INIT_EXPORT(_func, EXPORT_UNIT_TEST)
+#define UNIT_TEST_EXPORT(_func) INIT_EXPORT(_func, EXPORT_LEVEL_TEST)
 #else
 #define UNIT_TEST_EXPORT(_func)
 #endif
@@ -108,7 +107,7 @@ void xhal_run(void);
         .name       = #_func,                                \
         .func       = (void *)&_func,                        \
         .data       = (void *)&poll_##_func##_data,          \
-        .level      = (int16_t)(EXPORT_POLL),                \
+        .level      = (int16_t)(EXPORT_LEVEL_POLL),          \
         .period_ms  = (uint32_t)(_period_ms),                \
         .magic_head = EXPORT_ID_POLL,                        \
         .magic_tail = EXPORT_ID_POLL,                        \
@@ -124,7 +123,7 @@ void xhal_run(void);
         .name       = #_func,                                     \
         .func       = (void *)&_func,                             \
         .data       = (void *)&poll_##_func##_data,               \
-        .level      = (int16_t)(EXPORT_POLL),                     \
+        .level      = (int16_t)(EXPORT_LEVEL_POLL),               \
         .period_ms  = (uint32_t)(_period_ms),                     \
         .priority   = (osPriority_t)(_priority),                  \
         .stack_size = (uint32_t)(_stack_size),                    \

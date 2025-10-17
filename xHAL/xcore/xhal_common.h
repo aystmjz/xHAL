@@ -16,4 +16,6 @@
 uint32_t xhal_version(void);
 const char *xhal_version_str(void);
 
+const char *xhal_err_to_str(xhal_err_t err);
+
 #endif /* __XHAL_COMMON_H */

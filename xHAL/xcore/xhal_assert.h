@@ -13,15 +13,15 @@
 #endif
 
 #if XASSERT_FULL_PATH_ENABLE != 0
-#define __XASSERT_FILE__ __XHAL_FILEPATH__
+#define __XASSERT_FILE__ XHAL_FILEPATH
 #else
-#define __XASSERT_FILE__ __XHAL_FILENAME__
+#define __XASSERT_FILE__ XHAL_FILENAME
 #endif
 
 #define XASSERT_INVALID_ID (-1)
 
 void _assert(const char *str, uint32_t id, const char *tag, const char *file,
-             uint32_t line);
+             const char *func, uint32_t line);
 
 #if XASSERT_ENABLE != 0
 
@@ -34,7 +34,7 @@ void _assert(const char *str, uint32_t id, const char *tag, const char *file,
     {                                                         \
         if (!(test))                                          \
             _assert(#test, (uint32_t)XASSERT_INVALID_ID, TAG, \
-                    __XASSERT_FILE__, __XHAL_LINE__);         \
+                    __XASSERT_FILE__, __func__, XHAL_LINE);   \
     } while (0)
 
 #define xassert_tag(test, tag)                                \
@@ -42,7 +42,7 @@ void _assert(const char *str, uint32_t id, const char *tag, const char *file,
     {                                                         \
         if (!(test))                                          \
             _assert(#test, (uint32_t)XASSERT_INVALID_ID, tag, \
-                    __XASSERT_FILE__, __XHAL_LINE__);         \
+                    __XASSERT_FILE__, __func__, XHAL_LINE);   \
     } while (0)
 
 /**
@@ -55,7 +55,7 @@ void _assert(const char *str, uint32_t id, const char *tag, const char *file,
     {                                                                          \
         if (!(test))                                                           \
             _assert(name, (uint32_t)XASSERT_INVALID_ID, TAG, __XASSERT_FILE__, \
-                    __XHAL_LINE__);                                            \
+                    __func__, XHAL_LINE);                                      \
     } while (0)
 
 /**
@@ -63,12 +63,12 @@ void _assert(const char *str, uint32_t id, const char *tag, const char *file,
  * @param  test   给定的条件
  * @param  id     给定的ID
  */
-#define xassert_id(test, id)                                    \
-    do                                                          \
-    {                                                           \
-        if (!(test))                                            \
-            _assert(#test, (uint32_t)id, TAG, __XASSERT_FILE__, \
-                    __XHAL_LINE__);                             \
+#define xassert_id(test, id)                                              \
+    do                                                                    \
+    {                                                                     \
+        if (!(test))                                                      \
+            _assert(#test, (uint32_t)id, TAG, __XASSERT_FILE__, __func__, \
+                    XHAL_LINE);                                           \
     } while (0)
 
 /**

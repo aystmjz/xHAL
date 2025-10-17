@@ -2,12 +2,12 @@
 #include "xhal_time.h"
 #include <stdio.h>
 
-#define XLOG_BUFF_SIZE       (256)     /* 日志缓冲区大小 */
-#define XLOG_DEFAULT_PUTCHAR (putchar) /* 默认日志输出函数 */
+#define XLOG_BUFF_SIZE     (256)  /* 日志缓冲区大小 */
+#define XLOG_DEFAULT_PUTS  (puts) /* 默认日志输出函数 */
 
-#define XLOG_TIME_MILLIS     (1)
-#define XLOG_TIME_RELATIVE   (2)
-#define XLOG_TIME_ABSOLUTE   (3)
+#define XLOG_TIME_MILLIS   (1)
+#define XLOG_TIME_RELATIVE (2)
+#define XLOG_TIME_ABSOLUTE (3)
 
 #ifndef XLOG_COLOR_ENABLE
 #define XLOG_COLOR_ENABLE (1) /* 日志颜色显示 */
@@ -58,22 +58,44 @@ static const char XLOG_level_lable[XLOG_LEVEL_MAX] = {
     ' ', 'E', 'W', 'I', 'D',
 };
 
-static uint8_t XLOG_level            = XLOG_LEVEL_DEBUG;
-static xlog_output_char_t _xlog_putc = (xlog_output_char_t)XLOG_DEFAULT_PUTCHAR;
-
-void xlog_putc(char c)
-{
-    _xlog_putc(c);
-}
+static uint8_t XLOG_level           = XLOG_LEVEL_DEBUG;
+static xlog_output_str_t _xlog_puts = (xlog_output_str_t)XLOG_DEFAULT_PUTS;
 
 void xlog_puts(const char *s)
 {
-    if (s == NULL)
-        return;
+    _xlog_puts(s);
+}
 
-    while (*s)
+void xlog_putc(char c)
+{
+    char str[2];
+    str[0] = c;
+    str[1] = '\0';
+    _xlog_puts(str);
+}
+
+/**
+ * @brief 设置日志输出函数
+ * @param func 新的日志输出函数指针，如果为NULL则使用默认输出函数
+ */
+void xlog_set_puts_func(xlog_output_str_t func)
+{
+    if (func != NULL)
+        _xlog_puts = func;
+    else
+        _xlog_puts = (xlog_output_str_t)XLOG_DEFAULT_PUTS;
+}
+
+/**
+ * @brief 设置日志级别
+ * @param level 新的日志级别
+ */
+void xlog_set_level(uint8_t level)
+{
+    XLOG_level = level;
+    if (XLOG_level >= XLOG_LEVEL_MAX)
     {
-        _xlog_putc(*s++);
+        XLOG_level = XLOG_LEVEL_MAX - 1;
     }
 }
 
@@ -115,38 +137,13 @@ xhal_err_t xlog_printf(const char *fmt, ...)
         ret = XHAL_OK;
     }
 
-    xlog_puts(buff);
+    _xlog_puts(buff);
 
 #ifdef XHAL_OS_SUPPORTING
     osMutexRelease(mutex);
 #endif
 
     return ret;
-}
-
-/**
- * @brief 设置日志输出函数
- * @param func 新的日志输出函数指针，如果为NULL则使用默认输出函数
- */
-void xlog_set_putc_func(xlog_output_char_t func)
-{
-    if (func != NULL)
-        _xlog_putc = func;
-    else
-        _xlog_putc = (xlog_output_char_t)XLOG_DEFAULT_PUTCHAR;
-}
-
-/**
- * @brief 设置日志级别
- * @param level 新的日志级别
- */
-void xlog_set_level(uint8_t level)
-{
-    XLOG_level = level;
-    if (XLOG_level >= XLOG_LEVEL_MAX)
-    {
-        XLOG_level = XLOG_LEVEL_MAX - 1;
-    }
 }
 
 xhal_err_t xlog_print_log(const char *name, uint8_t level, const char *fmt, ...)
@@ -230,14 +227,14 @@ xhal_err_t xlog_print_log(const char *name, uint8_t level, const char *fmt, ...)
         return XHAL_ERR_NO_MEMORY;
     }
 
-    xlog_puts(buff);
+    _xlog_puts(buff);
 
 #if (XLOG_NEWLINE_ENABLE != 0)
-    xlog_puts(XHAL_STR_ENTER);
+    _xlog_puts(XHAL_STR_ENTER);
 #endif
 
 #if (XLOG_COLOR_ENABLE != 0)
-    xlog_puts(NONE); /* 重置颜色 */
+    _xlog_puts(NONE); /* 重置颜色 */
 #endif
 
 #ifdef XHAL_OS_SUPPORTING
@@ -247,20 +244,7 @@ xhal_err_t xlog_print_log(const char *name, uint8_t level, const char *fmt, ...)
     return XHAL_OK;
 }
 
-#ifdef XHAL_OS_SUPPORTING
-static osMutexId_t _xlog_mutex(void)
-{
-    if (xlog_mutex == NULL)
-    {
-        xlog_mutex = osMutexNew(&xlog_mutex_attr);
-    }
-
-    return xlog_mutex;
-}
-#endif
-
 #if XLOG_DUMP_ENABLE != 0
-
 #include "../xlib/xhal_bit.h"
 
 /* 只输出 16 进制格式数据时，每行实际会输出的字节数 */
@@ -447,5 +431,16 @@ xhal_err_t xlog_dump_mem(void *addr, xhal_size_t size, uint8_t flags_mask)
 
     return XHAL_OK;
 }
+#endif
 
+#ifdef XHAL_OS_SUPPORTING
+static osMutexId_t _xlog_mutex(void)
+{
+    if (xlog_mutex == NULL)
+    {
+        xlog_mutex = osMutexNew(&xlog_mutex_attr);
+    }
+
+    return xlog_mutex;
+}
 #endif

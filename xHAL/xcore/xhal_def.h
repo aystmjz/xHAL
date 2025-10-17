@@ -6,22 +6,27 @@
 #define XHAL_NAME_SIZE    (32)
 #define XHAL_WAIT_FOREVER (0xFFFFFFFFU)
 
+#define XHAL_ERR_LIST                                  \
+    ERR(XHAL_OK, 0, "Success")                         \
+    ERR(XHAL_ERROR, -1, "General error")               \
+    ERR(XHAL_ERR_EMPTY, -2, "Empty")                   \
+    ERR(XHAL_ERR_FULL, -3, "Full")                     \
+    ERR(XHAL_ERR_TIMEOUT, -4, "Timeout")               \
+    ERR(XHAL_ERR_BUSY, -5, "Busy")                     \
+    ERR(XHAL_ERR_NO_MEMORY, -6, "No memory")           \
+    ERR(XHAL_ERR_IO, -7, "IO error")                   \
+    ERR(XHAL_ERR_INVALID, -8, "Invalid argument")      \
+    ERR(XHAL_ERR_MEM_OVERLAY, -9, "Memory overlap")    \
+    ERR(XHAL_ERR_MALLOC, -10, "Malloc failed")         \
+    ERR(XHAL_ERR_NOT_ENOUGH, -11, "Not enough")        \
+    ERR(XHAL_ERR_NO_SYSTEM, -12, "System unavailable") \
+    ERR(XHAL_ERR_BUS, -13, "Bus error")
+
 typedef enum xhal_err
 {
-    XHAL_OK        = 0,    /* 操作成功，无错误 */
-    XHAL_ERROR     = -1,   /* 通用错误，未指定具体错误类型 */
-    XHAL_ERR_EMPTY = -2,   /* 空错误，例如队列或缓冲区为空 */
-    XHAL_ERR_FULL  = -3,   /* 满错误，例如队列或缓冲区已满 */
-    XHAL_ERR_TIMEOUT = -4, /* 超时错误，操作在指定时间内未完成 */
-    XHAL_ERR_BUSY      = -5, /* 忙错误，设备或资源正在使用中 */
-    XHAL_ERR_NO_MEMORY = -6, /* 内存不足错误，无法分配所需内存 */
-    XHAL_ERR_IO        = -7, /* IO错误，输入输出操作失败 */
-    XHAL_ERR_INVALID   = -8, /* 无效参数错误，传入的参数不合法 */
-    XHAL_ERR_MEM_OVERLAY = -9, /* 内存重叠错误，内存区域发生重叠 */
-    XHAL_ERR_MALLOC = -10, /* 内存分配错误，malloc等内存分配函数失败 */
-    XHAL_ERR_NOT_ENOUGH = -11, /* 不足错误，资源或数据不够 */
-    XHAL_ERR_NO_SYSTEM  = -12, /* 系统错误，系统资源不可用 */
-    XHAL_ERR_BUS        = -13, /* 总线错误，硬件总线通信失败 */
+#define ERR(code, value, str) code = value,
+    XHAL_ERR_LIST
+#undef ERR
 } xhal_err_t;
 
 #if defined(__linux__)
@@ -50,10 +55,10 @@ typedef enum xhal_err
 
 #if defined(__x86_64__) || defined(__aarch64__)
 typedef int64_t xhal_pointer_t;
-typedef int64_t xhal_size_t;
+typedef uint64_t xhal_size_t;
 #elif defined(__i386__) || defined(__arm__)
 typedef int32_t xhal_pointer_t;
-typedef int32_t xhal_size_t;
+typedef uint32_t xhal_size_t;
 #else
 #error The currnet CPU is NOT supported!
 #endif
@@ -72,8 +77,6 @@ typedef int32_t xhal_size_t;
 
 #define xhal_offsetof(type, member) ((xhal_pointer_t) & ((type *)0)->member)
 
-#define __FILENAME__                (__basename(__FILE__))
-
 static inline const char *__basename(const char *path)
 {
     const char *p    = path;
@@ -87,15 +90,17 @@ static inline const char *__basename(const char *path)
     return last;
 }
 
-#define __XHAL_LINE__     __LINE__
-#define __XHAL_FILENAME__ (__basename(__FILE__))
-#define __XHAL_FILEPATH__ __FILE__
+#define XHAL_LINE            __LINE__
+#define XHAL_FILENAME        __basename(__FILE__)
+#define XHAL_FILEPATH        __FILE__
 
-#define XHAL_STR(x)       #x
+#define XHAL_UNIQUE_ID(base) base##__COUNTER__
+
+#define XHAL_STR(x)          #x
 /**
  * @brief 字符串化。
  */
-#define XHAL_XSTR(x)      XHAL_STR(x)
+#define XHAL_XSTR(x)         XHAL_STR(x)
 
 /* Compiler Related Definitions */
 #if defined(__CC_ARM) || defined(__CLANG_ARM) /* ARM Compiler */

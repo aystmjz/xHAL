@@ -12,7 +12,7 @@ void XHAL_WEAK xassert_func(void)
 }
 
 void _assert(const char *str, uint32_t id, const char *tag, const char *file,
-             uint32_t line)
+             const char *func, uint32_t line)
 {
     if (str == NULL || tag == NULL || file == NULL)
         return;
@@ -22,17 +22,19 @@ void _assert(const char *str, uint32_t id, const char *tag, const char *file,
                    " Assert failure!\r\n"
                    " Module   | %s\r\n"
                    " Location | %s:%d\r\n"
+                   " Function | %s\r\n"
                    " Info     | %s\r\n"
                    "=============================\r",
-                   tag, file, line, str);
+                   tag, file, line, func, str);
     else
         XLOG_ERROR("\r\n==============================\r\n"
                    " Assert failure!\r\n"
                    " Module   | %s\r\n"
                    " Location | %s:%d\r\n"
+                   " Function | %s\r\n"
                    " Info     | %s\r\n"
                    " ID       | %d\r\n"
                    "==============================",
-                   tag, file, line, str, id);
+                   tag, file, line, func, str, id);
     xassert_func();
 }

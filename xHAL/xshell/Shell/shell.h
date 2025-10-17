@@ -146,7 +146,7 @@
      */
     #define SHELL_EXPORT_CMD(_attr, _name, _func, _desc) \
             const char shellCmd##_name[] = #_name; \
-            const char shellDesc##_name[] = #_desc; \
+            const char shellDesc##_name[] = _desc; \
             SHELL_USED const ShellCommand \
             shellCommand##_name SHELL_SECTION("shellCommand") =  \
             { \
@@ -181,7 +181,7 @@
      */
     #define SHELL_EXPORT_VAR(_attr, _name, _value, _desc) \
             const char shellCmd##_name[] = #_name; \
-            const char shellDesc##_name[] = #_desc; \
+            const char shellDesc##_name[] = _desc; \
             SHELL_USED const ShellCommand \
             shellVar##_name SHELL_SECTION("shellCommand") =  \
             { \
@@ -203,8 +203,8 @@
      */
     #define SHELL_EXPORT_USER(_attr, _name, _password, _desc) \
             const char shellCmd##_name[] = #_name; \
-            const char shellPassword##_name[] = #_password; \
-            const char shellDesc##_name[] = #_desc; \
+            const char shellPassword##_name[] = _password; \
+            const char shellDesc##_name[] = _desc; \
             SHELL_USED const ShellCommand \
             shellUser##_name SHELL_SECTION("shellCommand") =  \
             { \
@@ -225,7 +225,7 @@
      * @param _desc 按键描述
      */
     #define SHELL_EXPORT_KEY(_attr, _value, _func, _desc) \
-            const char shellDesc##_value[] = #_desc; \
+            const char shellDesc##_value[] = _desc; \
             SHELL_USED const ShellCommand \
             shellKey##_value SHELL_SECTION("shellCommand") =  \
             { \
@@ -511,5 +511,3 @@ void *shellCompanionGet(Shell *shell, int id);
 #endif
 
 #endif
-
-
