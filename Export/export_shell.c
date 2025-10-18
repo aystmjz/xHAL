@@ -25,7 +25,7 @@ static int16_t shell_write(void *data, uint16_t size)
 
 static void shell_driver(void)
 {
-    shell_usart = xperiph_find("usart1");
+    shell_usart = xperiph_find("debug_usart");
     xassert_not_null(shell_usart);
 
     shell.read  = (int16_t(*)(char *, uint16_t))shell_read;

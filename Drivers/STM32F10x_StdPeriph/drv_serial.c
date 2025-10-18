@@ -354,21 +354,23 @@ void USART1_IRQHandler(void)
     if (USART_GetITStatus(info->usart, USART_IT_IDLE) != RESET)
     {
         /* 立即清除 IDLE 中断标志（SR + DR） */
-        (void)info->usart->SR;
-        (void)info->usart->DR;
+        XHAL_UNUSED(info->usart->SR);
+        XHAL_UNUSED(info->usart->DR);
 
-#ifdef XHAL_OS_SUPPORTING
-        if (usart_p[id]->data.rx_expect)
-        {
-            osEventFlagsSet(usart_p[id]->data.event_flag,
-                            XSERIAL_EVENT_CAN_READ);
-        }
-#endif
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
         uint16_t received  = uart_rx_dma_len[id] - remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
         uart_rx_dma_len[id] = 0;
+
+#ifdef XHAL_OS_SUPPORTING
+        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
+            usart_p[id]->data.rx_expect)
+        {
+            osEventFlagsSet(usart_p[id]->data.event_flag,
+                            XSERIAL_EVENT_CAN_READ);
+        }
+#endif
 
         uint16_t len =
             xrbuf_get_linear_block_write_length(&usart_p[id]->data.rx_rbuf);
@@ -453,7 +455,7 @@ void DMA1_Channel5_IRQHandler(void)
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
 
 #ifdef XHAL_OS_SUPPORTING
-        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >
+        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
             usart_p[id]->data.rx_expect)
         {
             osEventFlagsSet(usart_p[id]->data.event_flag,
@@ -501,21 +503,23 @@ void USART2_IRQHandler(void)
     if (USART_GetITStatus(info->usart, USART_IT_IDLE) != RESET)
     {
         /* 立即清除 IDLE 中断标志（SR + DR） */
-        (void)info->usart->SR;
-        (void)info->usart->DR;
+        XHAL_UNUSED(info->usart->SR);
+        XHAL_UNUSED(info->usart->DR);
 
-#ifdef XHAL_OS_SUPPORTING
-        if (usart_p[id]->data.rx_expect)
-        {
-            osEventFlagsSet(usart_p[id]->data.event_flag,
-                            XSERIAL_EVENT_CAN_READ);
-        }
-#endif
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
         uint16_t received  = uart_rx_dma_len[id] - remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
         uart_rx_dma_len[id] = 0;
+
+#ifdef XHAL_OS_SUPPORTING
+        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
+            usart_p[id]->data.rx_expect)
+        {
+            osEventFlagsSet(usart_p[id]->data.event_flag,
+                            XSERIAL_EVENT_CAN_READ);
+        }
+#endif
 
         uint16_t len =
             xrbuf_get_linear_block_write_length(&usart_p[id]->data.rx_rbuf);
@@ -600,7 +604,7 @@ void DMA1_Channel6_IRQHandler(void)
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
 
 #ifdef XHAL_OS_SUPPORTING
-        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >
+        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
             usart_p[id]->data.rx_expect)
         {
             osEventFlagsSet(usart_p[id]->data.event_flag,
@@ -639,7 +643,6 @@ void DMA1_Channel6_IRQHandler(void)
     }
 }
 
-
 /* ==== USART3 IRQ handlers ==== */
 void USART3_IRQHandler(void)
 {
@@ -649,21 +652,23 @@ void USART3_IRQHandler(void)
     if (USART_GetITStatus(info->usart, USART_IT_IDLE) != RESET)
     {
         /* 立即清除 IDLE 中断标志（SR + DR） */
-        (void)info->usart->SR;
-        (void)info->usart->DR;
+        XHAL_UNUSED(info->usart->SR);
+        XHAL_UNUSED(info->usart->DR);
 
-#ifdef XHAL_OS_SUPPORTING
-        if (usart_p[id]->data.rx_expect)
-        {
-            osEventFlagsSet(usart_p[id]->data.event_flag,
-                            XSERIAL_EVENT_CAN_READ);
-        }
-#endif
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
         uint16_t received  = uart_rx_dma_len[id] - remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
         uart_rx_dma_len[id] = 0;
+
+#ifdef XHAL_OS_SUPPORTING
+        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
+            usart_p[id]->data.rx_expect)
+        {
+            osEventFlagsSet(usart_p[id]->data.event_flag,
+                            XSERIAL_EVENT_CAN_READ);
+        }
+#endif
 
         uint16_t len =
             xrbuf_get_linear_block_write_length(&usart_p[id]->data.rx_rbuf);
@@ -733,7 +738,7 @@ void DMA1_Channel3_IRQHandler(void)
     const uint32_t DMAy_IT_HTx = DMA1_IT_HT3;
     const uint32_t DMAy_IT_TCx = DMA1_IT_TC3;
 
-    const usart_hw_info_t *info = &usart_table[3];
+    const usart_hw_info_t *info = &usart_table[2];
     const uint8_t id            = info->id;
 
     if (DMA_GetITStatus(DMAy_IT_HTx) != RESET)
@@ -748,7 +753,7 @@ void DMA1_Channel3_IRQHandler(void)
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
 
 #ifdef XHAL_OS_SUPPORTING
-        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >
+        if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
             usart_p[id]->data.rx_expect)
         {
             osEventFlagsSet(usart_p[id]->data.event_flag,

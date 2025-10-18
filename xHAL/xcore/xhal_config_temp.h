@@ -8,7 +8,7 @@
 
 #define XOS_TICK_RATE_HZ             (1000)
 
-#define XEXPORT_THREAD_STACK_SIZE    (1024)
+#define XEXPORT_THREAD_STACK_SIZE    (1524)
 
 #define XASSERT_ENABLE               (1)
 #define XASSERT_FULL_PATH_ENABLE     (1)
