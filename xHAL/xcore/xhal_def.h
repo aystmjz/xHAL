@@ -54,10 +54,12 @@ typedef enum xhal_err
     } while (0)
 
 #if defined(__x86_64__) || defined(__aarch64__)
-typedef int64_t xhal_pointer_t;
+typedef int64_t xhal_offset_t;
+typedef uint64_t xhal_pointer_t;
 typedef uint64_t xhal_size_t;
 #elif defined(__i386__) || defined(__arm__)
-typedef int32_t xhal_pointer_t;
+typedef int32_t xhal_offset_t;
+typedef uint32_t xhal_pointer_t;
 typedef uint32_t xhal_size_t;
 #else
 #error The currnet CPU is NOT supported!
@@ -91,8 +93,10 @@ static inline const char *__basename(const char *path)
 }
 
 #define XHAL_LINE            __LINE__
+#define XHAL_FUNCNAME        __func__
 #define XHAL_FILENAME        __basename(__FILE__)
 #define XHAL_FILEPATH        __FILE__
+
 
 #define XHAL_UNIQUE_ID(base) base##__COUNTER__
 

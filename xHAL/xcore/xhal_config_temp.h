@@ -12,11 +12,14 @@
 
 #define XASSERT_ENABLE               (1)
 #define XASSERT_FULL_PATH_ENABLE     (1)
+#define XASSERT_FUNC_ENABLE          (1)
+#define XASSERT_BACKTRACE_ENABLE     (1)
+#define XASSERT_USER_HOOK_ENABLE     (1)
 
 #define XLOG_TIME_MODE               (XLOG_TIME_RELATIVE)
 
 #define XMALLOC_BLOCK_SIZE           (16)
-#define XMALLOC_MAX_SIZE             (7 * 1024)
+#define XMALLOC_MAX_SIZE             (8 * 1024)
 
 #define XLOG_COLOR_ENABLE            (1)
 #define XLOG_NEWLINE_ENABLE          (1)
@@ -31,5 +34,13 @@
 
 #define XSHELL_DEFAULT_USER          "aystmjz"
 #define XSHELL_DEFAULT_USER_PASSWORD "pswd"
+
+#define XTRACE_FIRMWARE_NAME         "Smart-Wake-Up-Light"
+#define XTRACE_HARDWARE_VERSION      "1.0.0"
+#define XTRACE_SOFTWARE_VERSION      "1.0.0"
+
+#define XTRACE_OS_PLATFORM_TYPE      CMB_OS_PLATFORM_FREERTOS
+#define XTRACE_CPU_PLATFORM_TYPE     CMB_CPU_ARM_CORTEX_M3
+#define XTRACE_CMB_PRINT_LANGUAGE    CMB_PRINT_LANGUAGE_ENGLISH
 
 #endif /* __XHAL_CONFIG_H */
