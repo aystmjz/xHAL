@@ -43,17 +43,17 @@
 /**
  * @brief 是否在输出命令列表中列出用户
  */
-#define SHELL_HELP_LIST_USER        0
+#define SHELL_HELP_LIST_USER        1
 
 /**
  * @brief 是否在输出命令列表中列出变量
  */
-#define SHELL_HELP_LIST_VAR         0
+#define SHELL_HELP_LIST_VAR         1
 
 /**
  * @brief 是否在输出命令列表中列出按键
  */
-#define SHELL_HELP_LIST_KEY         0
+#define SHELL_HELP_LIST_KEY         1
 
 /**
  * @brief 是否在输出命令列表中展示命令权限
@@ -83,7 +83,7 @@
  *        启用后，可以通过`exec [addr] [args]`直接执行对应地址的函数
  * @attention 如果地址错误，可能会直接引起程序崩溃
  */
-#define SHELL_EXEC_UNDEF_FUNC       0
+#define SHELL_EXEC_UNDEF_FUNC       1
 
 /**
  * @brief shell命令参数最大数量
@@ -94,7 +94,7 @@
 /**
  * @brief 历史命令记录数量
  */
-#define SHELL_HISTORY_MAX_NUMBER    5
+#define SHELL_HISTORY_MAX_NUMBER    10
 
 /**
  * @brief 双击间隔(ms)
@@ -124,12 +124,7 @@
  *        为0时不使用shell格式化输入
  * @note shell格式化输入会阻塞shellTask, 仅适用于在有操作系统的情况下使用
  */
-#ifdef XHAL_OS_SUPPORTING
-#define SHELL_SCAN_BUFFER           0
-#else
 #define SHELL_SCAN_BUFFER           128
-#endif
-
 
 /**
  * @brief 获取系统时间(ms)
@@ -164,7 +159,7 @@
 /**
  * @brief 是否在登录后清除命令行
  */
-#define SHELL_CLS_WHEN_LOGIN        1
+#define SHELL_CLS_WHEN_LOGIN        0
 
 /**
  * @brief shell默认用户
@@ -183,6 +178,6 @@
  *        设置为0时关闭自动锁定功能，时间单位为`SHELL_GET_TICK()`单位
  * @note 使用超时锁定必须保证`SHELL_GET_TICK()`有效
  */
-#define SHELL_LOCK_TIMEOUT        (1 * 60 * 1000)
+#define SHELL_LOCK_TIMEOUT          (1 * 60 * 1000)
 
 #endif

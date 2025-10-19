@@ -9,7 +9,8 @@ XLOG_TAG("xExportShell");
 #define SHELL_POLL_PERIOD_MS (10)
 #define SHELL_BUFFER_SIZE    (512)
 
-static Shell shell;
+Shell shell;
+
 static char shell_buffer[SHELL_BUFFER_SIZE];
 static xhal_periph_t *shell_usart;
 
@@ -28,8 +29,8 @@ static void shell_driver(void)
     shell_usart = xperiph_find("debug_usart");
     xassert_not_null(shell_usart);
 
-    shell.read  = (int16_t(*)(char *, uint16_t))shell_read;
-    shell.write = (int16_t(*)(char *, uint16_t))shell_write;
+    shell.read  = (signed short (*)(char *, unsigned short))shell_read;
+    shell.write = (signed short (*)(char *, unsigned short))shell_write;
 
     shellInit(&shell, shell_buffer, sizeof(shell_buffer));
 }

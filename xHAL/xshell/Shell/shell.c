@@ -269,7 +269,7 @@ void shellInit(Shell *shell, char *buffer, unsigned short size)
                                          SHELL_DEFAULT_USER,
                                          shell->commandList.base,
                                          0));
-    shellWritePrompt(shell, 1);
+    //shellWritePrompt(shell, 1);
 }
 
 
@@ -1827,7 +1827,37 @@ void shellWriteEndLine(Shell *shell, char *buffer, int len)
         if (shell->parser.length > 0)
         {
             shellWriteString(shell, shell->parser.buffer);
-            for (short i = 0; i < shell->parser.length - shell->parser.cursor; i++)
+            for (short i = 0; i < shell->parser.length - shell->parser.cursor;
+                 i++)
+            {
+                shellWriteByte(shell, '\b');
+            }
+        }
+    }
+    SHELL_UNLOCK(shell);
+}
+
+void shellRefreshLineStart(Shell *shell)
+{
+    SHELL_LOCK(shell);
+    if (!shell->status.isActive)
+    {
+        shellWriteString(shell, shellText[SHELL_TEXT_CLEAR_LINE]);
+    }
+    SHELL_UNLOCK(shell);
+}
+
+void shellRefreshLineEnd(Shell *shell)
+{
+    SHELL_LOCK(shell);
+    if (!shell->status.isActive)
+    {
+        shellWritePrompt(shell, 0);
+        if (shell->parser.length > 0)
+        {
+            shellWriteString(shell, shell->parser.buffer);
+            for (short i = 0; i < shell->parser.length - shell->parser.cursor;
+                 i++)
             {
                 shellWriteByte(shell, '\b');
             }

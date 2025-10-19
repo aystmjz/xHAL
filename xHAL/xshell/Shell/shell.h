@@ -16,7 +16,6 @@
 #include "shell_cfg.h"
 #include "../../xcore/xhal_def.h"
 
-#define ESH_KEY_CTRL_PLUS_A             (0x01000000)
 #define ESH_KEY_F1                      (0x1B4F5000)
 #define ESH_KEY_F2                      (0x1B4F5100)
 #define ESH_KEY_F3                      (0x1B4F5200)
@@ -39,10 +38,10 @@
 #define ESH_KEY_PAGEUP                  (0x1B5B357E)
 #define ESH_KEY_PAGEDOWN                (0x1B5B367E)
 
-#define shell_pointer_t                 xhal_pointer_t
+#define shell_pointer_t                 xhal_offset_t
 
-#define     SHELL_VERSION               "3.1.1"                 /**< 版本号 */
-#define     SHELL_MAGIC_NUM             (0xdeb55fed)
+#define SHELL_VERSION                   "3.1.1"                 /**< 版本号 */
+#define SHELL_MAGIC_NUM                 (0xdeb55fed)
 
 /**
  * @brief shell 断言
@@ -488,6 +487,8 @@ void shellScan(Shell *shell, char *fmt, ...);
 Shell* shellGetCurrent(void);
 void shellHandler(Shell *shell, char data);
 void shellWriteEndLine(Shell *shell, char *buffer, int len);
+void shellRefreshLineStart(Shell *shell);
+void shellRefreshLineEnd(Shell *shell);
 void shellTask(void *param);
 int shellRun(Shell *shell, const char *cmd);
 
