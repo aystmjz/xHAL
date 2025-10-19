@@ -2,17 +2,15 @@
 #define __XLOG_H
 
 #include "../xlib/xhal_bit.h"
-#include "xhal_common.h"
+#include "xhal_config.h"
+#include "xhal_def.h"
 
+#define XLOG_LEVEL_NULL    (0)
 #define XLOG_LEVEL_ERROR   (1) /* 错误级别，只输出错误信息 */
 #define XLOG_LEVEL_WARNING (2) /* 警告级别，输出警告信息 */
 #define XLOG_LEVEL_INFO    (3) /* 信息级别，输出一般信息 */
 #define XLOG_LEVEL_DEBUG   (4) /* 调试级别，输出最详细的调试信息 */
 #define XLOG_LEVEL_MAX     (5)
-
-#ifndef XLOG_DUMP_ENABLE
-#define XLOG_DUMP_ENABLE (1)
-#endif
 
 #ifndef XLOG_COMPILE_LEVEL
 #define XLOG_COMPILE_LEVEL (XLOG_LEVEL_DEBUG)
@@ -40,56 +38,67 @@
 #define XLOG_FILE_FORMAT
 #endif
 
-/* 内部用函数指针，默认绑定 */
-typedef void (*xlog_output_str_t)(const char *s);
+#ifndef XLOG_DEFAULT_OUTPUT
+#define XLOG_DEFAULT_OUTPUT xlog_default_output
+#endif
 
-void xlog_set_puts_func(xlog_output_str_t func);
+typedef void (*xlog_output_t)(const void *data, uint32_t size);
+
 void xlog_set_level(uint8_t level);
 
-void xlog_putc(char c);
-void xlog_puts(const char *s);
-
-xhal_err_t xlog_printf(const char *fmt, ...);
-xhal_err_t xlog_print_log(const char *name, uint8_t level, const char *fmt,
-                          ...);
+xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...);
+xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
+                           const char *fmt, ...);
 
 #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_ERROR
+
+#define XLOG_TAG_IMPL_TF(tag, write, ...)               \
+    static const char *TAG = tag;                       \
+    extern void write(const void *data, uint32_t size); \
+    static const XHAL_USED xlog_output_t WRITE = write;
+
+#define XLOG_TAG_IMPL_F(tag, write, ...)                \
+    extern void write(const void *data, uint32_t size); \
+    static const XHAL_USED xlog_output_t WRITE = write;
+
 /**
  * @brief 定义模块标签
  * @param tag 模块标签名称
  */
-#define XLOG_TAG(tag) static const char *TAG = tag
+#define XLOG_TAG(...) XLOG_TAG_IMPL_TF(__VA_ARGS__, XLOG_DEFAULT_OUTPUT)
 #else
-#define XLOG_TAG(tag)
-#endif
+#define XLOG_TAG(...) XLOG_TAG_IMPL_F(__VA_ARGS__, XLOG_DEFAULT_OUTPUT)
+#endif /* XLOG_COMPILE_LEVEL >= XLOG_LEVEL_ERROR */
+
+#define xlog_printf(fmt, ...) _xlog_printf(WRITE, fmt, ##__VA_ARGS__)
 
 #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_ERROR
-#define XLOG_ERROR(fmt, ...)                                    \
-    xlog_print_log(TAG, XLOG_LEVEL_ERROR, XLOG_FILE_FORMAT fmt, \
-                   XLOG_FILE_INFO, ##__VA_ARGS__)
+#define XLOG_ERROR(fmt, ...)                                            \
+    _xlog_print_log(WRITE, TAG, XLOG_LEVEL_ERROR, XLOG_FILE_FORMAT fmt, \
+                    XLOG_FILE_INFO, ##__VA_ARGS__)
 #else
 #define XLOG_ERROR(fmt, ...)
 #endif
 
 #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_WARNING
-#define XLOG_WARN(fmt, ...)                                       \
-    xlog_print_log(TAG, XLOG_LEVEL_WARNING, XLOG_FILE_FORMAT fmt, \
-                   XLOG_FILE_INFO, ##__VA_ARGS__)
+#define XLOG_WARN(fmt, ...)                                               \
+    _xlog_print_log(WRITE, TAG, XLOG_LEVEL_WARNING, XLOG_FILE_FORMAT fmt, \
+                    XLOG_FILE_INFO, ##__VA_ARGS__)
 #else
 #define XLOG_WARN(fmt, ...)
 #endif
 
 #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_INFO
 #define XLOG_INFO(fmt, ...) \
-    xlog_print_log(TAG, XLOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
+    _xlog_print_log(WRITE, TAG, XLOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
 #else
 #define XLOG_INFO(fmt, ...)
 #endif
 
 #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_DEBUG
-#define XLOG_DEBUG(fmt, ...)                                    \
-    xlog_print_log(TAG, XLOG_LEVEL_DEBUG, XLOG_FILE_FORMAT fmt, \
-                   XLOG_FILE_INFO, ##__VA_ARGS__)
+#define XLOG_DEBUG(fmt, ...)                                            \
+    _xlog_print_log(WRITE, TAG, XLOG_LEVEL_DEBUG, XLOG_FILE_FORMAT fmt, \
+                    XLOG_FILE_INFO, ##__VA_ARGS__)
 #define XDEBUG
 #else
 #define XLOG_DEBUG(fmt, ...)
@@ -99,50 +108,16 @@ xhal_err_t xlog_print_log(const char *name, uint8_t level, const char *fmt,
     XLOG_ERROR("%s failed in %s: %s", info, __func__, xhal_err_to_str(err))
 
 #ifdef XDEBUG
-#define XLOG_CHECK_RET(func)                            \
-    do                                                  \
-    {                                                   \
-        xhal_err_t XHAL_UNIQUE_ID(ret);                 \
-        XHAL_UNIQUE_ID(ret) = func;                     \
-        if (XHAL_UNIQUE_ID(ret) != XHAL_OK)             \
-            XLOG_PRINT_ERR(#func, XHAL_UNIQUE_ID(ret)); \
+#define XLOG_CHECK_RET(write)            \
+    do                                   \
+    {                                    \
+        xhal_err_t ret;                  \
+        ret = write;                     \
+        if (ret != XHAL_OK)              \
+            XLOG_PRINT_ERR(#write, ret); \
     } while (0)
 #else
-#define XLOG_CHECK_RET(func) func
+#define XLOG_CHECK_RET(write) write
 #endif
-
-#if XLOG_DUMP_ENABLE != 0
-
-#define XLOG_DUMP_HEAD_BIT       (0) // flags_mask 中表头的标志位
-#define XLOG_DUMP_ASCII_BIT      (1) // flags_mask 中 ASCII 的标志位
-#define XLOG_DUMP_ESCAPE_BIT     (2) // flags_mask 中带有转义字符的标志位
-#define XLOG_DUMP_TAIL_BIT       (3) // flags_mask 中表尾的标志位
-
-#define XLOG_DUMP_TABLE          (BIT(XLOG_DUMP_HEAD_BIT) | BIT(XLOG_DUMP_TAIL_BIT))
-
-/* 只输出 16 进制格式数据 */
-#define XLOG_DUMP_FLAG_HEX_ONLY  (XLOG_DUMP_TABLE)
-/* 输出 16 进制格式数据并带有 ASCII 字符 */
-#define XLOG_DUMP_FLAG_HEX_ASCII (BIT(XLOG_DUMP_ASCII_BIT) | XLOG_DUMP_TABLE)
-/* 输出 16 进制格式数据、 ASCII 字符、转义字符，其余输出 16 进制原始值 */
-#define XLOG_DUMP_FLAG_HEX_ASCII_ESCAPE \
-    (BIT(XLOG_DUMP_ESCAPE_BIT) | XLOG_DUMP_FLAG_HEX_ASCII)
-
-xhal_err_t xlog_dump_mem(void *addr, xhal_size_t size, uint8_t flags_mask);
-
-#define XLOG_DUMP_HEX(buffer, buffer_len) \
-    xlog_dump_mem(buffer, buffer_len, XLOG_DUMP_FLAG_HEX_ONLY)
-#define XLOG_DUMP_HEX_ASCII(buffer, buffer_len) \
-    xlog_dump_mem(buffer, buffer_len, XLOG_DUMP_FLAG_HEX_ASCII)
-#define XLOG_DUMP_HEX_ASCII_EX(buffer, buffer_len) \
-    xlog_dump_mem(buffer, buffer_len, XLOG_DUMP_FLAG_HEX_ASCII_ESCAPE)
-
-#else
-
-#define XLOG_DUMP_HEX(buffer, buffer_len)
-#define XLOG_DUMP_HEX_ASCII(buffer, buffer_len)
-#define XLOG_DUMP_HEX_ASCII_EX(buffer, buffer_len)
-
-#endif /* XLOG_DUMP_ENABLE != 0 */
 
 #endif /* __XLOG_H */

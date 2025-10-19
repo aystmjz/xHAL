@@ -5,6 +5,7 @@
     SPDX-License-Identifier: MIT
 ========================================================================= */
 #include "../../xcore/xhal_def.h"
+#include "../../xcore/xhal_log.h"
 /* Unity Configuration
  * As of May 11th, 2016 at ThrowTheSwitch/Unity commit 837c529
  * Update: December 29th, 2016
@@ -83,7 +84,7 @@
  *
  * Example:
  */
-#define UNITY_INT_WIDTH                      32
+#define UNITY_INT_WIDTH      32
 
 /* Define this to be the number of bits a `long` takes up on your system. The
  * default, if not autodetected, is 32 bits. This is used to figure out what
@@ -93,7 +94,7 @@
  *
  * Example:
  */
-#define UNITY_LONG_WIDTH                     32
+#define UNITY_LONG_WIDTH     32
 
 /* Define this to be the number of bits a pointer takes up on your system. The
  * default, if not autodetected, is 32-bits. If you're getting ugly compiler
@@ -101,7 +102,7 @@
  *
  * Example:
  */
-#define UNITY_POINTER_WIDTH                  32
+#define UNITY_POINTER_WIDTH  32
 
 /* Unity will automatically include 64-bit support if it auto-detects it, or if
  * your `int`, `long`, or pointer widths are greater than 32-bits. Define this
@@ -221,8 +222,12 @@
  * `stdout` option. You decide to route your test result output to a custom
  * serial `RS232_putc()` function you wrote like thus:
  */
-#define UNITY_OUTPUT_CHAR(a)                 xlog_putc(a)
-#define UNITY_OUTPUT_CHAR_HEADER_DECLARATION xlog_putc(char)
+#define UNITY_OUTPUT_CHAR(c) _xlog_printf(XLOG_DEFAULT_OUTPUT, "%c", c)
+
+#define UNITY_OUTPUT_CHAR_HEADER_DECLARATION                            \
+    xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...); \
+    extern void XLOG_DEFAULT_OUTPUT(const void *data, uint32_t size);
+
 /* #define UNITY_OUTPUT_FLUSH()                    RS232_flush() */
 /* #define UNITY_OUTPUT_FLUSH_HEADER_DECLARATION   RS232_flush(void) */
 /* #define UNITY_OUTPUT_START()                    RS232_config(115200,1,8,0) */

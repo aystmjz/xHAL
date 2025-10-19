@@ -24,9 +24,9 @@
 #define XLOG_COLOR_ENABLE            (1)
 #define XLOG_NEWLINE_ENABLE          (1)
 #define XLOG_TIME_ENABLE             (1)
-#define XLOG_DUMP_ENABLE             (1)
 #define XLOG_FILEINFO_ENABLE         (1)
 #define XLOG_FULL_PATH_ENABLE        (0)
+#define XLOG_DEFAULT_OUTPUT          xlog_output
 #define XLOG_COMPILE_LEVEL           (XLOG_LEVEL_DEBUG)
 
 #define XTIME_AUTO_SYNC_ENABLE       (1)

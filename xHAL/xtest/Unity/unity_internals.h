@@ -345,7 +345,7 @@ typedef UNITY_DOUBLE_TYPE UNITY_DOUBLE;
 /* If defined as something else, make sure we declare it here so it's ready for
  * use */
 #ifdef UNITY_OUTPUT_CHAR_HEADER_DECLARATION
-extern void UNITY_OUTPUT_CHAR_HEADER_DECLARATION;
+extern UNITY_OUTPUT_CHAR_HEADER_DECLARATION;
 #endif
 #endif
 
