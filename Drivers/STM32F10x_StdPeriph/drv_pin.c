@@ -11,10 +11,10 @@
 
 XLOG_TAG("xDriverPin");
 
-static xhal_err_t _init(xhal_pin_t *self);
+static xhal_err_t _init(xhal_pin_t *self, xhal_pin_state_t status);
 static xhal_err_t _set_mode(xhal_pin_t *self, xhal_pin_mode_t mode);
-static xhal_err_t _get_status(xhal_pin_t *self, xhal_pin_state_t *status);
-static xhal_err_t _set_status(xhal_pin_t *self, xhal_pin_state_t status);
+static xhal_err_t _read(xhal_pin_t *self, xhal_pin_state_t *status);
+static xhal_err_t _write(xhal_pin_t *self, xhal_pin_state_t status);
 
 static void _gpio_clock_enable(const char *name);
 static bool _check_pin_name_valid(const char *name);
@@ -22,13 +22,13 @@ static GPIO_TypeDef *_get_port_from_name(const char *name);
 static uint16_t _get_pin_from_name(const char *name);
 
 const xhal_pin_ops_t pin_ops_driver = {
-    .init       = _init,
-    .set_mode   = _set_mode,
-    .get_status = _get_status,
-    .set_status = _set_status,
+    .init     = _init,
+    .set_mode = _set_mode,
+    .read     = _read,
+    .write    = _write,
 };
 
-static xhal_err_t _init(xhal_pin_t *self)
+static xhal_err_t _init(xhal_pin_t *self, xhal_pin_state_t status)
 {
     xassert_name(_check_pin_name_valid(self->data.name), self->data.name);
 
@@ -41,7 +41,7 @@ static xhal_err_t _init(xhal_pin_t *self)
     if (self->data.mode == XPIN_MODE_OUTPUT_PP ||
         self->data.mode == XPIN_MODE_OUTPUT_OD)
     {
-        ret = _set_status(self, XPIN_RESET);
+        ret = _write(self, status);
     }
 
     return ret;
@@ -81,19 +81,19 @@ static xhal_err_t _set_mode(xhal_pin_t *self, xhal_pin_mode_t mode)
     return XHAL_OK;
 }
 
-static xhal_err_t _get_status(xhal_pin_t *self, xhal_pin_state_t *status)
+static xhal_err_t _read(xhal_pin_t *self, xhal_pin_state_t *status)
 {
     GPIO_TypeDef *port = _get_port_from_name(self->data.name);
     uint16_t pin       = _get_pin_from_name(self->data.name);
 
-    uint8_t gpio_status = GPIO_ReadOutputDataBit(port, pin);
+    uint8_t gpio_status = GPIO_ReadInputDataBit(port, pin);
 
-    *status = (gpio_status == XPIN_SET) ? XPIN_SET : XPIN_RESET;
+    *status = (gpio_status == Bit_SET) ? XPIN_SET : XPIN_RESET;
 
     return XHAL_OK;
 }
 
-static xhal_err_t _set_status(xhal_pin_t *self, xhal_pin_state_t status)
+static xhal_err_t _write(xhal_pin_t *self, xhal_pin_state_t status)
 {
     GPIO_TypeDef *port = _get_port_from_name(self->data.name);
     uint16_t pin       = _get_pin_from_name(self->data.name);

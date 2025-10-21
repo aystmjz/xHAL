@@ -135,8 +135,8 @@ static xhal_err_t _init(xhal_serial_t *self)
     uart_rx_dma_len[info->id] = self->data.rx_rbuf.size;
 
     _usart_gpio_msp_init(self);
-    _usart_dma_irq_msp_init(self);
     ret = _set_attr(self, &self->data.attr);
+    _usart_dma_irq_msp_init(self);
 
     _dma_config_transfer(info->dma_rx, (u32)&info->usart->DR,
                          (u32)self->data.rx_rbuf.buff, self->data.rx_rbuf.size);
@@ -146,6 +146,15 @@ static xhal_err_t _init(xhal_serial_t *self)
 static xhal_err_t _set_attr(xhal_serial_t *self, const xhal_serial_attr_t *attr)
 {
     const usart_hw_info_t *info = _find_usart_info(self->data.name);
+
+    if (info->usart_clk == RCC_APB2Periph_USART1)
+    {
+        RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+    }
+    else
+    {
+        RCC_APB1PeriphClockCmd(info->usart_clk, ENABLE);
+    }
 
     USART_Cmd(info->usart, DISABLE);
 

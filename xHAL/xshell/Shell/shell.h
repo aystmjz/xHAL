@@ -40,7 +40,7 @@
 
 #define shell_pointer_t                 xhal_offset_t
 
-#define SHELL_VERSION                   "3.1.1"                 /**< 版本号 */
+#define SHELL_VERSION                   SOFTWARE_VERSION /**< 版本号 */
 #define SHELL_MAGIC_NUM                 (0xdeb55fed)
 
 /**

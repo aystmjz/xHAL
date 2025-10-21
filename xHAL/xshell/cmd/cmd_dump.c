@@ -257,4 +257,4 @@ static int dump_cmd(int argc, char *argv[])
     return 0;
 }
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
-                 dump, dump_cmd, "dump memory\r\n" CMD_DUMP_CDISCRIPTION);
+                 dump, dump_cmd, "\r\ndump memory\r\n" CMD_DUMP_CDISCRIPTION);

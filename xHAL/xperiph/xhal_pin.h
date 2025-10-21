@@ -24,10 +24,10 @@ typedef enum xhal_pin_state
 
 typedef struct xhal_pin_ops
 {
-    xhal_err_t (*init)(xhal_pin_t *self);
+    xhal_err_t (*init)(xhal_pin_t *self, xhal_pin_state_t status);
     xhal_err_t (*set_mode)(xhal_pin_t *self, xhal_pin_mode_t mode);
-    xhal_err_t (*get_status)(xhal_pin_t *self, xhal_pin_state_t *status);
-    xhal_err_t (*set_status)(xhal_pin_t *self, xhal_pin_state_t status);
+    xhal_err_t (*read)(xhal_pin_t *self, xhal_pin_state_t *status);
+    xhal_err_t (*write)(xhal_pin_t *self, xhal_pin_state_t status);
 } xhal_pin_ops_t;
 
 typedef struct xhal_pin_data
@@ -49,10 +49,11 @@ typedef struct xhal_pin
 
 xhal_err_t xpin_inst(xhal_pin_t *self, const char *name,
                      const xhal_pin_ops_t *ops, const char *pin_name,
-                     xhal_pin_mode_t mode);
+                     xhal_pin_mode_t mode, xhal_pin_state_t status);
 
 xhal_err_t xpin_set_mode(xhal_periph_t *self, xhal_pin_mode_t mode);
-xhal_pin_state_t xpin_get_status(xhal_periph_t *self);
-xhal_err_t xpin_set_status(xhal_periph_t *self, xhal_pin_state_t status);
+xhal_pin_state_t xpin_read(xhal_periph_t *self);
+xhal_err_t xpin_write(xhal_periph_t *self, xhal_pin_state_t status);
+xhal_err_t xpin_toggle(xhal_periph_t *self);
 
 #endif /* __XHAL_PIN_H */

@@ -26,6 +26,8 @@
 
 #define XHAL_VERSION_STR "1.3.2"
 
+extern const char xhal_logo[];
+
 uint32_t xhal_version(void);
 const char *xhal_version_str(void);
 

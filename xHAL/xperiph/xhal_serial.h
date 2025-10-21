@@ -110,6 +110,7 @@ uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
 uint32_t xserial_discard(xhal_periph_t *self, uint32_t size);
 uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
                      uint32_t offset, uint32_t *index);
+xhal_err_t xserial_clear(xhal_periph_t *self);
 
 uint32_t xserial_term_scanf(xhal_periph_t *self, const char *fmt, ...);
 

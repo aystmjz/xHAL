@@ -4,6 +4,7 @@
 #include "xhal_std.h"
 
 #define XHAL_NAME_SIZE    (32)
+#define XHAL_NO_WAIT      (0x0U)
 #define XHAL_WAIT_FOREVER (0xFFFFFFFFU)
 
 #define XHAL_ERR_LIST                                  \
@@ -96,7 +97,6 @@ static inline const char *__basename(const char *path)
 #define XHAL_FUNCNAME        __func__
 #define XHAL_FILENAME        __basename(__FILE__)
 #define XHAL_FILEPATH        __FILE__
-
 
 #define XHAL_UNIQUE_ID(base) base##__COUNTER__
 

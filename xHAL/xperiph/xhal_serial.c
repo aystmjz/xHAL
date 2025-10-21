@@ -80,8 +80,9 @@ uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
 {
     xassert_not_null(self);
     xassert_not_null(data);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, 0);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
+
     if (size == 0)
         return 0;
 
@@ -131,8 +132,8 @@ uint32_t xserial_read_timeout(xhal_periph_t *self, void *buf, uint32_t size,
 {
     xassert_not_null(self);
     xassert_not_null(buf);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, 0);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     if (size == 0)
         return 0;
 
@@ -183,8 +184,8 @@ uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
 {
     xassert_not_null(self);
     xassert_not_null(buff);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, 0);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     if (size == 0)
         return 0;
 
@@ -208,8 +209,8 @@ uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
 uint32_t xserial_discard(xhal_periph_t *self, uint32_t size)
 {
     xassert_not_null(self);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, 0);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     if (size == 0)
         return 0;
 
@@ -236,8 +237,8 @@ uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
     xassert_not_null(self);
     xassert_not_null(data);
     xassert_not_null(index);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, 0);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     if (size == 0)
         return 0;
 
@@ -256,6 +257,30 @@ uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
     xassert(ret_os == osOK);
 #endif
     return found;
+}
+
+xhal_err_t xserial_clear(xhal_periph_t *self)
+{
+    xassert_not_null(self);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
+
+    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+
+#ifdef XHAL_OS_SUPPORTING
+    osStatus_t ret_os = osOK;
+    ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
+    xassert(ret_os == osOK);
+#endif
+    uint32_t full = xrbuf_get_full(&serial->data.rx_rbuf);
+    uint32_t len  = xrbuf_skip(&serial->data.rx_rbuf, full);
+    xassert_name(len == full, self->attr.name);
+
+#ifdef XHAL_OS_SUPPORTING
+    ret_os = osMutexRelease(serial->data.rx_mutex);
+    xassert(ret_os == osOK);
+#endif
+    return XHAL_OK;
 }
 
 uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...)
@@ -296,8 +321,8 @@ uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...)
 {
     xassert_not_null(self);
     xassert_not_null(fmt);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, 0);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
     int32_t ret           = 0;
@@ -383,8 +408,8 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
 {
     xassert_not_null(self);
     xassert_not_null(status);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
 
@@ -416,8 +441,8 @@ xhal_err_t xserial_get_attr(xhal_periph_t *self, xhal_serial_attr_t *attr)
 {
     xassert_not_null(self);
     xassert_not_null(attr);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
 
@@ -432,8 +457,8 @@ xhal_err_t xserial_set_attr(xhal_periph_t *self, xhal_serial_attr_t *attr)
 {
     xassert_not_null(self);
     xassert_not_null(attr);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
     xhal_err_t ret        = XHAL_OK;
@@ -452,8 +477,8 @@ xhal_err_t xserial_set_attr(xhal_periph_t *self, xhal_serial_attr_t *attr)
 xhal_err_t xserial_set_baudrate(xhal_periph_t *self, uint32_t baudrate)
 {
     xassert_not_null(self);
-    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
 
