@@ -25,25 +25,25 @@ XLOG_TAG("xSerial");
 
 xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
                         const xhal_serial_ops_t *ops, const char *serial_name,
-                        const xhal_serial_attr_t *attr, void *tx_buff,
+                        const xhal_serial_config_t *config, void *tx_buff,
                         void *rx_buff, uint32_t tx_bufsz, uint32_t rx_bufsz)
 {
     xassert_not_null(self);
     xassert_not_null(name);
     xassert_not_null(serial_name);
-    xassert_not_null(attr);
+    xassert_not_null(config);
     xassert_ptr_struct_not_null(ops, name);
 
-    xhal_serial_t *serial          = self;
-    xhal_periph_attr_t periph_attr = {
+    xhal_serial_t *serial            = self;
+    xhal_periph_attr_t periph_config = {
         .name = name,
         .type = XHAL_PERIPH_UART,
     };
-    xperiph_register(&serial->peri, &periph_attr);
+    xperiph_register(&serial->peri, &periph_config);
 
-    serial->ops       = ops;
-    serial->data.attr = *attr;
-    serial->data.name = serial_name;
+    serial->ops         = ops;
+    serial->data.config = *config;
+    serial->data.name   = serial_name;
 
     xrbuf_init(&serial->data.tx_rbuf, tx_buff, tx_bufsz);
     xrbuf_init(&serial->data.rx_rbuf, rx_buff, rx_bufsz);
@@ -90,11 +90,7 @@ uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
     xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
     uint32_t written             = 0;
 
-#ifdef XHAL_OS_SUPPORTING
-    osStatus_t ret_os = osOK;
-    ret_os            = osMutexAcquire(serial->data.tx_mutex, osWaitForever);
-    xassert(ret_os == osOK);
-#endif
+    xperiph_lock(self);
     while (1)
     {
         uint32_t w = serial->ops->transmit(
@@ -437,26 +433,26 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
     return XHAL_OK;
 }
 
-xhal_err_t xserial_get_attr(xhal_periph_t *self, xhal_serial_attr_t *attr)
+xhal_err_t xserial_get_config(xhal_periph_t *self, xhal_serial_config_t *config)
 {
     xassert_not_null(self);
-    xassert_not_null(attr);
+    xassert_not_null(config);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
 
     xperiph_lock(self);
-    *attr = serial->data.attr;
+    *config = serial->data.config;
     xperiph_unlock(self);
 
     return XHAL_OK;
 }
 
-xhal_err_t xserial_set_attr(xhal_periph_t *self, xhal_serial_attr_t *attr)
+xhal_err_t xserial_set_config(xhal_periph_t *self, xhal_serial_config_t *config)
 {
     xassert_not_null(self);
-    xassert_not_null(attr);
+    xassert_not_null(config);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
@@ -464,10 +460,10 @@ xhal_err_t xserial_set_attr(xhal_periph_t *self, xhal_serial_attr_t *attr)
     xhal_err_t ret        = XHAL_OK;
 
     xperiph_lock(self);
-    ret = serial->ops->set_attr(serial, attr);
+    ret = serial->ops->set_config(serial, config);
     if (ret == XHAL_OK)
     {
-        serial->data.attr = *attr;
+        serial->data.config = *config;
     }
     xperiph_unlock(self);
 
@@ -483,9 +479,9 @@ xhal_err_t xserial_set_baudrate(xhal_periph_t *self, uint32_t baudrate)
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
 
     xperiph_lock(self);
-    xhal_serial_attr_t attr = serial->data.attr;
+    xhal_serial_config_t config = serial->data.config;
     xperiph_unlock(self);
-    attr.baud_rate = baudrate;
+    config.baud_rate = baudrate;
 
-    return xserial_set_attr(self, &attr);
+    return xserial_set_config(self, &config);
 }

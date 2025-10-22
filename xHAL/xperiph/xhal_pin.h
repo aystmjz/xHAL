@@ -18,8 +18,8 @@ typedef enum xhal_pin_mode
 
 typedef enum xhal_pin_state
 {
-    XPIN_RESET = 0,
-    XPIN_SET
+    XPIN_LOW = 0,
+    XPIN_HIGH
 } xhal_pin_state_t;
 
 typedef struct xhal_pin_ops

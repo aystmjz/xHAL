@@ -16,14 +16,14 @@ static volatile uint16_t uart_rx_dma_len[3] = {0};
 static xhal_serial_t *usart_p[3]            = {NULL};
 
 static xhal_err_t _init(xhal_serial_t *self);
-static xhal_err_t _set_attr(xhal_serial_t *self,
-                            const xhal_serial_attr_t *attr);
+static xhal_err_t _set_config(xhal_serial_t *self,
+                              const xhal_serial_config_t *config);
 static uint32_t _transmit(xhal_serial_t *self, const void *buff, uint32_t size);
 
 const xhal_serial_ops_t serial_ops_driver = {
-    .init     = _init,
-    .set_attr = _set_attr,
-    .transmit = _transmit,
+    .init       = _init,
+    .set_config = _set_config,
+    .transmit   = _transmit,
 };
 
 typedef struct usart_hw_info usart_hw_info_t;
@@ -135,7 +135,7 @@ static xhal_err_t _init(xhal_serial_t *self)
     uart_rx_dma_len[info->id] = self->data.rx_rbuf.size;
 
     _usart_gpio_msp_init(self);
-    ret = _set_attr(self, &self->data.attr);
+    ret = _set_config(self, &self->data.config);
     _usart_dma_irq_msp_init(self);
 
     _dma_config_transfer(info->dma_rx, (u32)&info->usart->DR,
@@ -143,7 +143,8 @@ static xhal_err_t _init(xhal_serial_t *self)
 
     return ret;
 }
-static xhal_err_t _set_attr(xhal_serial_t *self, const xhal_serial_attr_t *attr)
+static xhal_err_t _set_config(xhal_serial_t *self,
+                              const xhal_serial_config_t *config)
 {
     const usart_hw_info_t *info = _find_usart_info(self->data.name);
 
@@ -159,14 +160,14 @@ static xhal_err_t _set_attr(xhal_serial_t *self, const xhal_serial_attr_t *attr)
     USART_Cmd(info->usart, DISABLE);
 
     USART_InitTypeDef USART_InitStruct;
-    USART_InitStruct.USART_BaudRate   = attr->baud_rate;
-    USART_InitStruct.USART_WordLength = (attr->data_bits == XSERIAL_DATA_BITS_8)
-                                            ? USART_WordLength_8b
-                                            : USART_WordLength_9b;
-    USART_InitStruct.USART_StopBits   = (attr->stop_bits == XSERIAL_STOP_BITS_1)
-                                            ? USART_StopBits_1
-                                            : USART_StopBits_2;
-    switch (attr->parity)
+    USART_InitStruct.USART_BaudRate = config->baud_rate;
+    USART_InitStruct.USART_WordLength =
+        (config->data_bits == XSERIAL_DATA_BITS_8) ? USART_WordLength_8b
+                                                   : USART_WordLength_9b;
+    USART_InitStruct.USART_StopBits = (config->stop_bits == XSERIAL_STOP_BITS_1)
+                                          ? USART_StopBits_1
+                                          : USART_StopBits_2;
+    switch (config->parity)
     {
     case XSERIAL_PARITY_ODD:
         USART_InitStruct.USART_Parity = USART_Parity_Odd;

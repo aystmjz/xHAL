@@ -88,7 +88,7 @@ static xhal_err_t _read(xhal_pin_t *self, xhal_pin_state_t *status)
 
     uint8_t gpio_status = GPIO_ReadInputDataBit(port, pin);
 
-    *status = (gpio_status == Bit_SET) ? XPIN_SET : XPIN_RESET;
+    *status = (gpio_status == Bit_SET) ? XPIN_HIGH : XPIN_LOW;
 
     return XHAL_OK;
 }
@@ -98,7 +98,7 @@ static xhal_err_t _write(xhal_pin_t *self, xhal_pin_state_t status)
     GPIO_TypeDef *port = _get_port_from_name(self->data.name);
     uint16_t pin       = _get_pin_from_name(self->data.name);
 
-    GPIO_WriteBit(port, pin, (status == XPIN_SET) ? Bit_SET : Bit_RESET);
+    GPIO_WriteBit(port, pin, (status == XPIN_HIGH) ? Bit_SET : Bit_RESET);
 
     return XHAL_OK;
 }

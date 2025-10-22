@@ -40,14 +40,14 @@ enum xhal_serial_parity
     XSERIAL_PARITY_EVEN,
 };
 
-typedef struct xhal_serial_attr
+typedef struct xhal_serial_config
 {
     uint32_t baud_rate;
     uint16_t data_bits : 4;
     uint16_t stop_bits : 2;
     uint16_t parity : 2;
     uint16_t reserved : 8;
-} xhal_serial_attr_t;
+} xhal_serial_config_t;
 
 typedef struct
 {
@@ -60,13 +60,14 @@ typedef struct
 typedef struct xhal_serial_ops
 {
     xhal_err_t (*init)(xhal_serial_t *self);
-    xhal_err_t (*set_attr)(xhal_serial_t *self, const xhal_serial_attr_t *attr);
+    xhal_err_t (*set_config)(xhal_serial_t *self,
+                             const xhal_serial_config_t *config);
     uint32_t (*transmit)(xhal_serial_t *self, const void *buff, uint32_t size);
 } xhal_serial_ops_t;
 
 typedef struct xhal_serial_data
 {
-    xhal_serial_attr_t attr;
+    xhal_serial_config_t config;
 
     xrbuf_t tx_rbuf;
     xrbuf_t rx_rbuf;
@@ -92,7 +93,7 @@ typedef struct xhal_serial
 
 xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
                         const xhal_serial_ops_t *ops, const char *serial_name,
-                        const xhal_serial_attr_t *attr, void *tx_buff,
+                        const xhal_serial_config_t *config, void *tx_buff,
                         void *rx_buff, uint32_t tx_bufsz, uint32_t rx_bufsz);
 
 uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...);
@@ -115,8 +116,10 @@ xhal_err_t xserial_clear(xhal_periph_t *self);
 uint32_t xserial_term_scanf(xhal_periph_t *self, const char *fmt, ...);
 
 xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status);
-xhal_err_t xserial_get_attr(xhal_periph_t *self, xhal_serial_attr_t *attr);
-xhal_err_t xserial_set_attr(xhal_periph_t *self, xhal_serial_attr_t *attr);
+xhal_err_t xserial_get_config(xhal_periph_t *self,
+                              xhal_serial_config_t *config);
+xhal_err_t xserial_set_config(xhal_periph_t *self,
+                              xhal_serial_config_t *config);
 xhal_err_t xserial_set_baudrate(xhal_periph_t *self, uint32_t baudrate);
 
 #endif /* __XHAL_SERIAL_H */

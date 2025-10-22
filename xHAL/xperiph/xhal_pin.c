@@ -125,7 +125,7 @@ xhal_err_t xpin_toggle(xhal_periph_t *self)
 
     xperiph_lock(self);
     const xhal_pin_state_t status = pin->data.status;
-    xhal_pin_state_t new_status = (status == XPIN_SET) ? XPIN_RESET : XPIN_SET;
+    xhal_pin_state_t new_status = (status == XPIN_HIGH) ? XPIN_LOW : XPIN_HIGH;
     ret                         = pin->ops->write(pin, new_status);
     if (ret == XHAL_OK)
         pin->data.status = new_status;
