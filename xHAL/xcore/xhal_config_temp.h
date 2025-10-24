@@ -6,6 +6,10 @@
 
 #define XHAL_CMSIS_DEVICE_HEADER     "stm32f10x.h"
 
+#define FIRMWARE_NAME                "Smart-Wake-Up-Light"
+#define HARDWARE_VERSION             "1.1.1"
+#define SOFTWARE_VERSION             "1.2.0"
+
 #define XOS_TICK_RATE_HZ             (1000)
 
 #define XEXPORT_THREAD_STACK_SIZE    (1524)
@@ -31,13 +35,14 @@
 
 #define XTIME_AUTO_SYNC_ENABLE       (1)
 #define XTIME_AUTO_SYNC_TIME         (60 * 60 * 60)
+#define XTIME_CPU_FREQ_HZ            (SystemCoreClock)
 
 #define XSHELL_DEFAULT_USER          "aystmjz"
 #define XSHELL_DEFAULT_USER_PASSWORD "pswd"
 
-#define XTRACE_FIRMWARE_NAME         "Smart-Wake-Up-Light"
-#define XTRACE_HARDWARE_VERSION      "1.0.0"
-#define XTRACE_SOFTWARE_VERSION      "1.0.0"
+#define XTRACE_FIRMWARE_NAME         FIRMWARE_NAME
+#define XTRACE_HARDWARE_VERSION      HARDWARE_VERSION
+#define XTRACE_SOFTWARE_VERSION      SOFTWARE_VERSION
 
 #define XTRACE_OS_PLATFORM_TYPE      CMB_OS_PLATFORM_FREERTOS
 #define XTRACE_CPU_PLATFORM_TYPE     CMB_CPU_ARM_CORTEX_M3

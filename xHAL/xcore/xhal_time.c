@@ -17,6 +17,10 @@ XLOG_TAG("xTime");
 #define XTIME_AUTO_SYNC_TIME (60 * 60 * 60)
 #endif
 
+#ifndef XTIME_CPU_FREQ_HZ
+#error "Please define XTIME_CPU_FREQ_HZ"
+#endif
+
 #ifdef XHAL_OS_SUPPORTING
 #include "../xos/xhal_os.h"
 
@@ -106,6 +110,15 @@ xhal_tick_sec_t xtime_get_tick_sec(void)
     return ret;
 }
 
+void xtime_delay_us(uint32_t delay_us)
+{
+    uint32_t count = delay_us * (XTIME_CPU_FREQ_HZ / 8U / 1000000U);
+    do
+    {
+        __NOP();
+    } while (count--);
+}
+
 void xtime_delay_ms(uint32_t delay_ms)
 {
     xhal_tick_ms_t start = xtime_get_tick_ms();
@@ -190,7 +203,7 @@ xhal_err_t xtime_get_format_time(char *time_str, uint8_t buff_len)
     /* 检查时间戳是否有效 */
     if (rawtime == XTIME_INVALID_TS)
     {
-        return XHAL_ERR_NO_SYSTEM;
+        return XHAL_ERR_NO_INIT;
     }
 
     struct tm timeinfo;
@@ -221,9 +234,9 @@ xhal_err_t xtime_sync_time_from_rtc(void)
     if (rtc_ts == XTIME_INVALID_TS)
     {
 #ifdef XDEBUG
-        XLOG_ERROR("XHAL_ERR_NO_SYSTEM");
+        XLOG_ERROR("XHAL_ERR_NO_INIT");
 #endif
-        return XHAL_ERR_NO_SYSTEM;
+        return XHAL_ERR_NO_INIT;
     }
 
     /* 检查RTC时间是否有效 */

@@ -7,20 +7,20 @@
 #define XHAL_NO_WAIT      (0x0U)
 #define XHAL_WAIT_FOREVER (0xFFFFFFFFU)
 
-#define XHAL_ERR_LIST                                  \
-    ERR(XHAL_OK, 0, "Success")                         \
-    ERR(XHAL_ERROR, -1, "General error")               \
-    ERR(XHAL_ERR_EMPTY, -2, "Empty")                   \
-    ERR(XHAL_ERR_FULL, -3, "Full")                     \
-    ERR(XHAL_ERR_TIMEOUT, -4, "Timeout")               \
-    ERR(XHAL_ERR_BUSY, -5, "Busy")                     \
-    ERR(XHAL_ERR_NO_MEMORY, -6, "No memory")           \
-    ERR(XHAL_ERR_IO, -7, "IO error")                   \
-    ERR(XHAL_ERR_INVALID, -8, "Invalid argument")      \
-    ERR(XHAL_ERR_MEM_OVERLAY, -9, "Memory overlap")    \
-    ERR(XHAL_ERR_MALLOC, -10, "Malloc failed")         \
-    ERR(XHAL_ERR_NOT_ENOUGH, -11, "Not enough")        \
-    ERR(XHAL_ERR_NO_SYSTEM, -12, "System unavailable") \
+#define XHAL_ERR_LIST                               \
+    ERR(XHAL_OK, 0, "Success")                      \
+    ERR(XHAL_ERROR, -1, "General error")            \
+    ERR(XHAL_ERR_EMPTY, -2, "Empty")                \
+    ERR(XHAL_ERR_FULL, -3, "Full")                  \
+    ERR(XHAL_ERR_TIMEOUT, -4, "Timeout")            \
+    ERR(XHAL_ERR_BUSY, -5, "Busy")                  \
+    ERR(XHAL_ERR_NO_MEMORY, -6, "No memory")        \
+    ERR(XHAL_ERR_IO, -7, "IO error")                \
+    ERR(XHAL_ERR_INVALID, -8, "Invalid argument")   \
+    ERR(XHAL_ERR_MEM_OVERLAY, -9, "Memory overlap") \
+    ERR(XHAL_ERR_MALLOC, -10, "Malloc failed")      \
+    ERR(XHAL_ERR_NOT_ENOUGH, -11, "Not enough")     \
+    ERR(XHAL_ERR_NO_INIT, -12, "Not initialized")   \
     ERR(XHAL_ERR_BUS, -13, "Bus error")
 
 typedef enum xhal_err

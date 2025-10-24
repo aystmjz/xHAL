@@ -14,6 +14,7 @@ typedef xhal_ts_t (*rtc_get_ts_func_t)(void);
 xhal_tick_ms_t xtime_get_tick_ms(void);
 xhal_tick_sec_t xtime_get_tick_sec(void);
 
+void xtime_delay_us(uint32_t delay_us);
 void xtime_delay_ms(uint32_t delay_ms);
 void xtime_delay_s(uint32_t delay_s);
 

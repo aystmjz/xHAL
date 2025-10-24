@@ -41,7 +41,7 @@ xhal_err_t xpin_set_mode(xhal_periph_t *self, xhal_pin_mode_t mode)
 {
     xassert_not_null(self);
     xassert_name(mode < XPIN_MODE_MAX, self->attr.name);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_PIN);
 
     xhal_err_t ret  = XHAL_OK;
@@ -91,7 +91,7 @@ xhal_err_t xpin_write(xhal_periph_t *self, xhal_pin_state_t status)
     xassert_name(XPIN_CAST(self)->data.mode == XPIN_MODE_OUTPUT_PP ||
                      XPIN_CAST(self)->data.mode == XPIN_MODE_OUTPUT_OD,
                  self->attr.name);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_PIN);
 
     xhal_err_t ret  = XHAL_OK;
@@ -117,7 +117,7 @@ xhal_err_t xpin_toggle(xhal_periph_t *self)
     xassert_name(XPIN_CAST(self)->data.mode == XPIN_MODE_OUTPUT_PP ||
                      XPIN_CAST(self)->data.mode == XPIN_MODE_OUTPUT_OD,
                  self->attr.name);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_PIN);
 
     xhal_err_t ret  = XHAL_OK;

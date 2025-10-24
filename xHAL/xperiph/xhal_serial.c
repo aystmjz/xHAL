@@ -90,7 +90,11 @@ uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
     xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
     uint32_t written             = 0;
 
-    xperiph_lock(self);
+#ifdef XHAL_OS_SUPPORTING
+    osStatus_t ret_os = osOK;
+    ret_os            = osMutexAcquire(serial->data.tx_mutex, osWaitForever);
+    xassert(ret_os == osOK);
+#endif
     while (1)
     {
         uint32_t w = serial->ops->transmit(
@@ -258,7 +262,7 @@ uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
 xhal_err_t xserial_clear(xhal_periph_t *self)
 {
     xassert_not_null(self);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
@@ -404,7 +408,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
 {
     xassert_not_null(self);
     xassert_not_null(status);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
@@ -437,7 +441,7 @@ xhal_err_t xserial_get_config(xhal_periph_t *self, xhal_serial_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
@@ -453,7 +457,7 @@ xhal_err_t xserial_set_config(xhal_periph_t *self, xhal_serial_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
@@ -473,7 +477,7 @@ xhal_err_t xserial_set_config(xhal_periph_t *self, xhal_serial_config_t *config)
 xhal_err_t xserial_set_baudrate(xhal_periph_t *self, uint32_t baudrate)
 {
     xassert_not_null(self);
-    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_SYSTEM);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
     xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
