@@ -11,14 +11,19 @@
 
 typedef enum xport_level
 {
-    EXPORT_LEVEL_POLL    = -2,
-    EXPORT_LEVEL_TEST    = -1,
-    EXPORT_LEVEL_CORE    = 0,
-    EXPORT_LEVEL_PERIPH  = 1,
-    EXPORT_LEVEL_DRIVER  = 2,
-    EXPORT_LEVEL_MIDWARE = 3,
-    EXPORT_LEVEL_APP     = 4,
-    EXPORT_LEVEL_USER    = 5,
+    EXPORT_LEVEL_NULL    = -3,
+    EXPORT_LEVEL_TEST    = -2,
+    EXPORT_LEVEL_POLL    = -1,
+    
+    EXPORT_LEVEL_DEBUG   = 0,
+    EXPORT_LEVEL_CORE    = 1,
+    EXPORT_LEVEL_PERIPH  = 2,
+    EXPORT_LEVEL_DRIVER  = 3,
+    EXPORT_LEVEL_MIDWARE = 4,
+    EXPORT_LEVEL_APP     = 5,
+    EXPORT_LEVEL_USER    = 6,
+
+    EXPORT_LEVEL_MAX
 } xport_level_t;
 
 /* 轮询导出数据结构 */

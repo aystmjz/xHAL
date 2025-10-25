@@ -16,11 +16,11 @@ XLOG_TAG("xExport");
 #include "../xos/xhal_os.h"
 
 #define XEXPORT_THREAD_OVERHEAD    (160)
-#define XEXPORT_DEFAULT_STACK_SIZE (512)
+#define XEXPORT_DEFAULT_STACK_SIZE (1024)
 #define XEXPORT_DEFAULT_PRIORITY   (osPriorityNormal)
 
 #ifndef XEXPORT_THREAD_STACK_SIZE
-#define XEXPORT_THREAD_STACK_SIZE (1024)
+#define XEXPORT_THREAD_STACK_SIZE (2048)
 #endif
 
 static const osThreadAttr_t export_thread_attr = {
@@ -39,16 +39,18 @@ static void _get_init_export_table(void);
 static void _export_init_func(int16_t level);
 static void _export_poll_func(void);
 
-static void module_null_init(void)
+static void null_init(void)
 {
     /* do nothing */
 }
-INIT_EXPORT(module_null_init, 0);
-static void module_null_poll(void)
+INIT_EXPORT(null_init, EXPORT_LEVEL_NULL);
+static void null_poll(void)
 {
+#ifdef XHAL_OS_SUPPORTING
     osThreadExit();
+#endif
 }
-POLL_EXPORT(module_null_poll, (60 * 60 * 60 * 60));
+POLL_EXPORT(null_poll, (60 * 1000));
 
 static const xhal_export_t *export_init_table = NULL; /* 初始化导出表 */
 static const xhal_export_t *export_poll_table = NULL; /* 轮询导出表 */
@@ -83,7 +85,7 @@ void xhal_run(void)
 #else
 
 #ifdef XHAL_UNIT_TEST
-    _export_init_func(EXPORT_UNIT_TEST);
+    _export_init_func(EXPORT_LEVEL_TEST);
 
     while (1)
     {
@@ -102,7 +104,7 @@ void xhal_run(void)
 
 static void _get_init_export_table(void)
 {
-    xhal_export_t *func_block = (xhal_export_t *)&init_module_null_init;
+    xhal_export_t *func_block = (xhal_export_t *)&init_null_init;
     xhal_pointer_t address_last;
 
     while (1)
@@ -144,7 +146,7 @@ static void _get_init_export_table(void)
 
 static void _get_poll_export_table(void)
 {
-    xhal_export_t *func_block = ((xhal_export_t *)&poll_module_null_poll);
+    xhal_export_t *func_block = ((xhal_export_t *)&poll_null_poll);
     xhal_pointer_t address_last;
 
     while (1)
@@ -193,7 +195,7 @@ static void _export_init_func(int16_t level)
             {
 
 #ifdef XHAL_UNIT_TEST
-                if (level == EXPORT_UNIT_TEST)
+                if (level == EXPORT_LEVEL_TEST)
                 {
                     XLOG_INFO("Export unit test: %s",
                               export_init_table[i].name);
@@ -220,10 +222,16 @@ static void _entry_start_export(void *para)
         _export_init_func(level);
     }
 
-    _export_poll_func();
-
     uint16_t perused   = xmem_perused();
     uint32_t free_size = xmem_free_size();
+
+    XLOG_INFO("Init thread ended, Memory usage: %d.%d%%, Free size: %lu bytes",
+              perused / 10, perused % 10, free_size);
+
+    _export_poll_func();
+
+    perused   = xmem_perused();
+    free_size = xmem_free_size();
 
     XLOG_INFO("Poll thread ended, Memory usage: %d.%d%%, Free size: %lu bytes",
               perused / 10, perused % 10, free_size);
@@ -249,14 +257,12 @@ static void _poll_thread(void *arg)
         uint32_t end        = osKernelGetTickCount();
         uint32_t exec_ticks = end - start;
 
-        if (exec_ticks > period_ticks)
+        if (period_ticks != 0 && exec_ticks > period_ticks)
         {
             XLOG_WARN("Poll task '%s' execution overrun: %lu > %lu ticks",
                       export->name, exec_ticks, period_ticks);
         }
-
         next_wake += period_ticks;
-
         osDelayUntil(next_wake);
     }
 }
@@ -265,6 +271,10 @@ static void _export_poll_func(void)
 {
     for (uint32_t i = 0; i < count_export_poll; i++)
     {
+        if ((xhal_pointer_t)&export_poll_table[i] ==
+            (xhal_pointer_t)&poll_null_poll)
+            continue;
+
         osThreadAttr_t attr = {
             .attr_bits = osThreadDetached,
             .name      = export_poll_table[i].name,
