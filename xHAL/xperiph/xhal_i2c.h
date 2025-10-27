@@ -13,6 +13,11 @@
 #define XI2C_NOSTART    0x4000 /* 不发送重复 START */
 #define XI2C_STOP       0x8000 /* 发送 STOP 信号 */
 
+#define XI2C_CONFIG_DEFAULT                         \
+    {                                               \
+        100000, /* Default 100 kHz standard mode */ \
+    }
+
 typedef struct xhal_i2c xhal_i2c_t;
 
 typedef struct xhal_i2c_msg
@@ -65,12 +70,12 @@ xhal_err_t xi2c_inst(xhal_i2c_t *self, const char *name,
 xhal_err_t xi2c_transfer(xhal_periph_t *self, xhal_i2c_msg_t *msgs,
                          uint32_t num, uint32_t timeout_ms);
 xhal_err_t xi2c_read(xhal_periph_t *self, uint16_t addr, uint8_t *buff,
-                     uint16_t size, uint16_t flags, uint32_t timeout);
+                     uint16_t size, uint16_t flags, uint32_t timeout_ms);
 xhal_err_t xi2c_write(xhal_periph_t *self, uint16_t addr, uint8_t *buff,
-                      uint16_t len, uint16_t flags, uint32_t timeout);
+                      uint16_t len, uint16_t flags, uint32_t timeout_ms);
 xhal_err_t xi2c_write_read(xhal_periph_t *self, uint16_t addr, uint8_t *wbuf,
                            uint16_t wlen, uint8_t *rbuf, uint16_t rlen,
-                           uint16_t flags, uint32_t timeout);
+                           uint16_t flags, uint32_t timeout_ms);
 
 xhal_err_t xi2c_set_config(xhal_periph_t *self, xhal_i2c_config_t *config);
 xhal_err_t xi2c_get_config(xhal_periph_t *self, xhal_i2c_config_t *config);

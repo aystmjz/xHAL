@@ -75,8 +75,8 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
     return XHAL_OK;
 }
 
-uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
-                               uint32_t size, uint32_t timeout_ms)
+uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
+                       uint32_t timeout_ms)
 {
     xassert_not_null(self);
     xassert_not_null(data);
@@ -122,13 +122,8 @@ uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
     return written;
 }
 
-uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size)
-{
-    return xserial_write_timeout(self, data, size, XHAL_WAIT_FOREVER);
-}
-
-uint32_t xserial_read_timeout(xhal_periph_t *self, void *buf, uint32_t size,
-                              uint32_t timeout_ms)
+uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
+                      uint32_t timeout_ms)
 {
     xassert_not_null(self);
     xassert_not_null(buf);
@@ -172,11 +167,6 @@ uint32_t xserial_read_timeout(xhal_periph_t *self, void *buf, uint32_t size,
 #endif
 
     return read;
-}
-
-uint32_t xserial_read(xhal_periph_t *self, void *buff, uint32_t size)
-{
-    return xserial_read_timeout(self, buff, size, XHAL_WAIT_FOREVER);
 }
 
 uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
@@ -298,7 +288,7 @@ uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...)
 
     if (len < sizeof(stack_buf))
     {
-        return xserial_write_timeout(self, stack_buf, len, XHAL_WAIT_FOREVER);
+        return xserial_write(self, stack_buf, len, XHAL_WAIT_FOREVER);
     }
 
     char *heap_buf = (char *)xmalloc(len + 1);
@@ -309,8 +299,7 @@ uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...)
     vsnprintf(heap_buf, len + 1, fmt, args);
     va_end(args);
 
-    uint32_t written =
-        xserial_write_timeout(self, heap_buf, len, XHAL_WAIT_FOREVER);
+    uint32_t written = xserial_write(self, heap_buf, len, XHAL_WAIT_FOREVER);
 
     xfree(heap_buf);
 
@@ -372,25 +361,27 @@ uint32_t xserial_term_scanf(xhal_periph_t *self, const char *fmt, ...)
     while (1)
     {
         /* 等待一个字节输入 */
-        if (xserial_read(self, &ch, 1) == 1)
+        if (xserial_read(self, &ch, 1, XHAL_WAIT_FOREVER) == 1)
         {
             if (ch == '\r' || ch == '\n')
             {
                 /* 回车：输入结束 */
-                xserial_write(self, "\r\n", 2); /* 回显换行 */
+                xserial_write(self, "\r\n", 2,
+                              XHAL_WAIT_FOREVER); /* 回显换行 */
                 break;
             }
             else if ((ch == '\b' || ch == 127) && len > 0)
             {
                 /* 退格键（8或127），删除一个字符 */
                 len--;
-                xserial_write(self, "\b \b", 3); /* 回显退格 */
+                xserial_write(self, "\b \b", 3,
+                              XHAL_WAIT_FOREVER); /* 回显退格 */
             }
             else if (len < sizeof(buf) - 1)
             {
                 /* 普通字符，存入缓冲区并回显 */
                 buf[len++] = ch;
-                xserial_write(self, &ch, 1);
+                xserial_write(self, &ch, 1, XHAL_WAIT_FOREVER);
             }
         }
     }

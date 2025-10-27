@@ -127,7 +127,7 @@ exit:
 }
 
 xhal_err_t xi2c_read(xhal_periph_t *self, uint16_t addr, uint8_t *buff,
-                     uint16_t len, uint16_t flags, uint32_t timeout)
+                     uint16_t len, uint16_t flags, uint32_t timeout_ms)
 {
     xassert_not_null(self);
     xassert_not_null(buff);
@@ -142,11 +142,11 @@ xhal_err_t xi2c_read(xhal_periph_t *self, uint16_t addr, uint8_t *buff,
     msg.buf   = buff;
     msg.len   = len;
 
-    return xi2c_transfer(self, &msg, 1, timeout);
+    return xi2c_transfer(self, &msg, 1, timeout_ms);
 }
 
 xhal_err_t xi2c_write(xhal_periph_t *self, uint16_t addr, uint8_t *buff,
-                      uint16_t len, uint16_t flags, uint32_t timeout)
+                      uint16_t len, uint16_t flags, uint32_t timeout_ms)
 {
     xassert_not_null(self);
     xassert_not_null(buff);
@@ -161,12 +161,12 @@ xhal_err_t xi2c_write(xhal_periph_t *self, uint16_t addr, uint8_t *buff,
     msg.buf   = buff;
     msg.len   = len;
 
-    return xi2c_transfer(self, &msg, 1, timeout);
+    return xi2c_transfer(self, &msg, 1, timeout_ms);
 }
 
 xhal_err_t xi2c_write_read(xhal_periph_t *self, uint16_t addr, uint8_t *wbuf,
                            uint16_t wlen, uint8_t *rbuf, uint16_t rlen,
-                           uint16_t flags, uint32_t timeout)
+                           uint16_t flags, uint32_t timeout_ms)
 {
     xassert_not_null(self);
     xassert_not_null(wbuf);
@@ -188,7 +188,7 @@ xhal_err_t xi2c_write_read(xhal_periph_t *self, uint16_t addr, uint8_t *wbuf,
     msgs[1].buf   = rbuf;
     msgs[1].len   = rlen;
 
-    return xi2c_transfer(self, msgs, 2, timeout);
+    return xi2c_transfer(self, msgs, 2, timeout_ms);
 }
 
 xhal_err_t xi2c_set_config(xhal_periph_t *self, xhal_i2c_config_t *config)

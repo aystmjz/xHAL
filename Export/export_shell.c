@@ -16,12 +16,13 @@ static xhal_periph_t *shell_usart;
 
 static int16_t shell_read(void *buff, uint16_t size)
 {
-    return (int16_t)xserial_read(shell_usart, buff, (uint32_t)size);
+    return (int16_t)xserial_read(shell_usart, buff, (uint32_t)size, 2);
 }
 
 static int16_t shell_write(void *data, uint16_t size)
 {
-    return (int16_t)xserial_write(shell_usart, data, (uint32_t)size);
+    return (int16_t)xserial_write(shell_usart, data, (uint32_t)size,
+                                  XHAL_WAIT_FOREVER);
 }
 
 static void shell_driver(void)

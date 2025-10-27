@@ -12,7 +12,7 @@ typedef struct xhal_serial xhal_serial_t;
 #define XSERIAL_TERM_SCANF_BUF_SIZE 128
 #define XSERIAL_PRINTF_BUF_SIZE     128
 
-#define XSERIAL_ATTR_DEFAULT                     \
+#define XSERIAL_CONFIG_DEFAULT                   \
     {                                            \
         115200,              /* 115200 bits/s */ \
         XSERIAL_DATA_BITS_8, /* 8 databits */    \
@@ -97,14 +97,12 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
                         void *rx_buff, uint32_t tx_bufsz, uint32_t rx_bufsz);
 
 uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...);
-uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size);
-uint32_t xserial_write_timeout(xhal_periph_t *self, const void *data,
-                               uint32_t size, uint32_t timeout_ms);
+uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
+                       uint32_t timeout_ms);
 
 uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...);
-uint32_t xserial_read(xhal_periph_t *self, void *buff, uint32_t size);
-uint32_t xserial_read_timeout(xhal_periph_t *self, void *buf, uint32_t size,
-                              uint32_t timeout_ms);
+uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
+                      uint32_t timeout_ms);
 
 uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
                       uint32_t size);

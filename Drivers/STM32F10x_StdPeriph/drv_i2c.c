@@ -6,6 +6,8 @@
 #include <string.h>
 #include XHAL_CMSIS_DEVICE_HEADER
 
+// #define I2C_DEBUG
+
 XLOG_TAG("xDriverI2C");
 
 typedef struct i2c_hw
@@ -97,12 +99,16 @@ static xhal_err_t _transfer(xhal_i2c_t *self, xhal_i2c_msg_t *msg)
     }
 
     _i2c_start(&hw);
+
+#ifdef I2C_DEBUG
+    xlog_printf("%s", (msg->flags & XI2C_RD) ? "(Rd) " : "(Wr) ");
+#endif
     if (msg->flags & XI2C_TEN)
     {
         /* 10 位地址 */
-        uint8_t addr_high =
-            0xF0 | ((msg->addr >> 7) & 0x06) | ((msg->flags & XI2C_RD) ? 1 : 0);
-        uint8_t addr_low = msg->addr & 0xFF;
+        uint8_t addr_high = 0xF0 | (uint8_t)(((msg->addr >> 8) & 0x03) << 1) |
+                            ((msg->flags & XI2C_RD) ? 1 : 0);
+        uint8_t addr_low = (uint8_t)(msg->addr & 0xFF);
         if (!_i2c_write_byte(&hw, addr_high))
         {
             if (!(msg->flags & XI2C_IGNORE_NAK))
@@ -206,6 +212,9 @@ static inline uint8_t _sda_read(i2c_hw_t *hw)
 
 static void _i2c_start(i2c_hw_t *hw)
 {
+#ifdef I2C_DEBUG
+    xlog_printf("S "); // Start condition
+#endif
     _sda_set(hw, 1);
     _scl_set(hw, 1);
     _i2c_delay(hw);
@@ -216,6 +225,9 @@ static void _i2c_start(i2c_hw_t *hw)
 
 static void _i2c_stop(i2c_hw_t *hw)
 {
+#ifdef I2C_DEBUG
+    xlog_printf("P\r\n");
+#endif
     _sda_set(hw, 0);
     _scl_set(hw, 1);
     _i2c_delay(hw);
@@ -225,6 +237,10 @@ static void _i2c_stop(i2c_hw_t *hw)
 
 static uint8_t _i2c_write_byte(i2c_hw_t *hw, uint8_t data)
 {
+#ifdef I2C_DEBUG
+    xlog_printf("%02X ", data);
+#endif
+
     for (int i = 0; i < 8; i++)
     {
         _sda_set(hw, (data & 0x80) != 0);
@@ -235,19 +251,24 @@ static uint8_t _i2c_write_byte(i2c_hw_t *hw, uint8_t data)
         data <<= 1;
     }
 
-    _sda_set(hw, 1); /* 释放 SDA */
+    _sda_set(hw, 1);
     _i2c_delay(hw);
     _scl_set(hw, 1);
     _i2c_delay(hw);
     uint8_t ack = !_sda_read(hw);
     _scl_set(hw, 0);
+
+#ifdef I2C_DEBUG
+    xlog_printf("[%c] ", ack ? 'A' : 'N');
+#endif
+
     return ack;
 }
 
 static uint8_t _i2c_read_byte(i2c_hw_t *hw, uint8_t ack)
 {
     uint8_t data = 0;
-    _sda_set(hw, 1); /* 释放 SDA */
+    _sda_set(hw, 1);
     for (int i = 0; i < 8; i++)
     {
         data <<= 1;
@@ -259,13 +280,17 @@ static uint8_t _i2c_read_byte(i2c_hw_t *hw, uint8_t ack)
         _i2c_delay(hw);
     }
 
-    /* 发送 ACK/NACK */
     _sda_set(hw, !ack);
     _i2c_delay(hw);
     _scl_set(hw, 1);
     _i2c_delay(hw);
     _scl_set(hw, 0);
     _sda_set(hw, 1);
+
+#ifdef I2C_DEBUG
+    xlog_printf("[%02X] %c ", data, ack ? 'A' : 'N');
+#endif
+
     return data;
 }
 

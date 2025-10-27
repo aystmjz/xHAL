@@ -3,8 +3,6 @@
 
 #include "xhal_std.h"
 
-#define XHAL_NAME_SIZE    (32)
-#define XHAL_NO_WAIT      (0x0U)
 #define XHAL_WAIT_FOREVER (0xFFFFFFFFU)
 
 #define XHAL_ERR_LIST                               \
