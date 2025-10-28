@@ -6,7 +6,7 @@
 #include XHAL_CMSIS_DEVICE_HEADER
 
 static xhal_serial_t debug_usart;
-static xhal_serial_config_t debug_usart_config = XSERIAL_CONFIG_DEFAULT;
+static const xhal_serial_config_t debug_usart_config = XSERIAL_CONFIG_DEFAULT;
 
 static char debug_usart_tx_buf[1024];
 static char debug_usart_rx_buf[256];

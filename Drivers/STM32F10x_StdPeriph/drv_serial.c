@@ -11,8 +11,13 @@
 
 XLOG_TAG("xDriverSerial");
 
-static volatile uint16_t uart_tx_dma_len[3] = {0};
-static volatile uint16_t uart_rx_dma_len[3] = {0};
+typedef struct
+{
+    uint16_t tx_dma_len;
+    uint16_t rx_dma_len;
+} uart_xfer_ctx_t;
+
+static volatile uart_xfer_ctx_t uart_ctx[3] = {0};
 static xhal_serial_t *usart_p[3]            = {NULL};
 
 static xhal_err_t _init(xhal_serial_t *self);
@@ -128,11 +133,11 @@ static xhal_err_t _init(xhal_serial_t *self)
 {
     xassert_name(_check_usart_name_valid(self->data.name), self->data.name);
 
-    const usart_hw_info_t *info = _find_usart_info(self->data.name);
-    xhal_err_t ret              = XHAL_OK;
+    xhal_err_t ret = XHAL_OK;
 
-    usart_p[info->id]         = self;
-    uart_rx_dma_len[info->id] = self->data.rx_rbuf.size;
+    const usart_hw_info_t *info   = _find_usart_info(self->data.name);
+    usart_p[info->id]             = self;
+    uart_ctx[info->id].rx_dma_len = self->data.rx_rbuf.size;
 
     _usart_gpio_msp_init(self);
     ret = _set_config(self, &self->data.config);
@@ -205,7 +210,7 @@ static uint32_t _transmit(xhal_serial_t *self, const void *buff, uint32_t size)
             return written;
         }
 
-        uart_tx_dma_len[info->id] = len;
+        uart_ctx[info->id].tx_dma_len = len;
 
         void *addr = xrbuf_get_linear_block_read_address(&self->data.tx_rbuf);
         _dma_config_transfer(info->dma_tx, (u32)&info->usart->DR, (u32)addr,
@@ -229,9 +234,6 @@ static bool _strcasecmp_upper(const char *s1, const char *s2)
 
 static bool _check_usart_name_valid(const char *name)
 {
-    if (!name)
-        return false;
-
     uint8_t len = strlen(name);
     if (len < 5 || len > 6)
         return false;
@@ -368,10 +370,10 @@ void USART1_IRQHandler(void)
         XHAL_UNUSED(info->usart->DR);
 
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
-        uint16_t received  = uart_rx_dma_len[id] - remaining;
+        uint16_t received  = uart_ctx[id].rx_dma_len - remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
-        uart_rx_dma_len[id] = 0;
+        uart_ctx[id].rx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
@@ -388,7 +390,7 @@ void USART1_IRQHandler(void)
         {
             return;
         }
-        uart_rx_dma_len[id] = len;
+        uart_ctx[id].rx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_write_address(&usart_p[id]->data.rx_rbuf);
@@ -408,10 +410,11 @@ void DMA1_Channel4_IRQHandler(void)
     if (DMA_GetITStatus(DMAy_IT_HTx) != RESET)
     {
         DMA_ClearITPendingBit(DMAy_IT_HTx);
-        uint16_t remaining = DMA_GetCurrDataCounter(info->dma_tx);
-        uint16_t sent      = uart_tx_dma_len[id] - remaining;
 
-        uart_tx_dma_len[id] = remaining;
+        uint16_t remaining = DMA_GetCurrDataCounter(info->dma_tx);
+        uint16_t sent      = uart_ctx[id].tx_dma_len - remaining;
+
+        uart_ctx[id].tx_dma_len = remaining;
 
         xrbuf_skip(&usart_p[id]->data.tx_rbuf, sent);
 
@@ -423,8 +426,8 @@ void DMA1_Channel4_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMAy_IT_TCx);
 
-        xrbuf_skip(&usart_p[id]->data.tx_rbuf, uart_tx_dma_len[id]);
-        uart_tx_dma_len[id] = 0;
+        xrbuf_skip(&usart_p[id]->data.tx_rbuf, uart_ctx[id].tx_dma_len);
+        uart_ctx[id].tx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         osEventFlagsSet(usart_p[id]->data.event_flag, XSERIAL_EVENT_CAN_WRITE);
@@ -436,7 +439,7 @@ void DMA1_Channel4_IRQHandler(void)
             return;
         }
 
-        uart_tx_dma_len[0] = len;
+        uart_ctx[id].tx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_read_address(&usart_p[id]->data.tx_rbuf);
@@ -458,9 +461,9 @@ void DMA1_Channel5_IRQHandler(void)
         DMA_ClearITPendingBit(DMAy_IT_HTx);
 
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
-        uint16_t received  = uart_rx_dma_len[id] - remaining;
+        uint16_t received  = uart_ctx[id].rx_dma_len - remaining;
 
-        uart_rx_dma_len[id] = remaining;
+        uart_ctx[id].rx_dma_len = remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
 
@@ -477,8 +480,8 @@ void DMA1_Channel5_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMAy_IT_TCx);
 
-        xrbuf_advance(&usart_p[id]->data.rx_rbuf, uart_rx_dma_len[id]);
-        uart_rx_dma_len[id] = 0;
+        xrbuf_advance(&usart_p[id]->data.rx_rbuf, uart_ctx[id].rx_dma_len);
+        uart_ctx[id].rx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >
@@ -495,7 +498,7 @@ void DMA1_Channel5_IRQHandler(void)
             return;
         }
 
-        uart_rx_dma_len[id] = len;
+        uart_ctx[id].rx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_write_address(&usart_p[id]->data.rx_rbuf);
@@ -517,10 +520,10 @@ void USART2_IRQHandler(void)
         XHAL_UNUSED(info->usart->DR);
 
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
-        uint16_t received  = uart_rx_dma_len[id] - remaining;
+        uint16_t received  = uart_ctx[id].rx_dma_len - remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
-        uart_rx_dma_len[id] = 0;
+        uart_ctx[id].rx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
@@ -537,7 +540,7 @@ void USART2_IRQHandler(void)
         {
             return;
         }
-        uart_rx_dma_len[id] = len;
+        uart_ctx[id].rx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_write_address(&usart_p[id]->data.rx_rbuf);
@@ -557,10 +560,11 @@ void DMA1_Channel7_IRQHandler(void)
     if (DMA_GetITStatus(DMAy_IT_HTx) != RESET)
     {
         DMA_ClearITPendingBit(DMAy_IT_HTx);
-        uint16_t remaining = DMA_GetCurrDataCounter(info->dma_tx);
-        uint16_t sent      = uart_tx_dma_len[id] - remaining;
 
-        uart_tx_dma_len[id] = remaining;
+        uint16_t remaining = DMA_GetCurrDataCounter(info->dma_tx);
+        uint16_t sent      = uart_ctx[id].tx_dma_len - remaining;
+
+        uart_ctx[id].tx_dma_len = remaining;
 
         xrbuf_skip(&usart_p[id]->data.tx_rbuf, sent);
 
@@ -572,8 +576,8 @@ void DMA1_Channel7_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMAy_IT_TCx);
 
-        xrbuf_skip(&usart_p[id]->data.tx_rbuf, uart_tx_dma_len[id]);
-        uart_tx_dma_len[id] = 0;
+        xrbuf_skip(&usart_p[id]->data.tx_rbuf, uart_ctx[id].tx_dma_len);
+        uart_ctx[id].tx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         osEventFlagsSet(usart_p[id]->data.event_flag, XSERIAL_EVENT_CAN_WRITE);
@@ -585,7 +589,7 @@ void DMA1_Channel7_IRQHandler(void)
             return;
         }
 
-        uart_tx_dma_len[0] = len;
+        uart_ctx[id].tx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_read_address(&usart_p[id]->data.tx_rbuf);
@@ -607,9 +611,9 @@ void DMA1_Channel6_IRQHandler(void)
         DMA_ClearITPendingBit(DMAy_IT_HTx);
 
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
-        uint16_t received  = uart_rx_dma_len[id] - remaining;
+        uint16_t received  = uart_ctx[id].rx_dma_len - remaining;
 
-        uart_rx_dma_len[id] = remaining;
+        uart_ctx[id].rx_dma_len = remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
 
@@ -626,8 +630,8 @@ void DMA1_Channel6_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMAy_IT_TCx);
 
-        xrbuf_advance(&usart_p[id]->data.rx_rbuf, uart_rx_dma_len[id]);
-        uart_rx_dma_len[id] = 0;
+        xrbuf_advance(&usart_p[id]->data.rx_rbuf, uart_ctx[id].rx_dma_len);
+        uart_ctx[id].rx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >
@@ -644,7 +648,7 @@ void DMA1_Channel6_IRQHandler(void)
             return;
         }
 
-        uart_rx_dma_len[id] = len;
+        uart_ctx[id].rx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_write_address(&usart_p[id]->data.rx_rbuf);
@@ -666,10 +670,10 @@ void USART3_IRQHandler(void)
         XHAL_UNUSED(info->usart->DR);
 
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
-        uint16_t received  = uart_rx_dma_len[id] - remaining;
+        uint16_t received  = uart_ctx[id].rx_dma_len - remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
-        uart_rx_dma_len[id] = 0;
+        uart_ctx[id].rx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >=
@@ -686,7 +690,7 @@ void USART3_IRQHandler(void)
         {
             return;
         }
-        uart_rx_dma_len[id] = len;
+        uart_ctx[id].rx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_write_address(&usart_p[id]->data.rx_rbuf);
@@ -706,10 +710,11 @@ void DMA1_Channel2_IRQHandler(void)
     if (DMA_GetITStatus(DMAy_IT_HTx) != RESET)
     {
         DMA_ClearITPendingBit(DMAy_IT_HTx);
-        uint16_t remaining = DMA_GetCurrDataCounter(info->dma_tx);
-        uint16_t sent      = uart_tx_dma_len[id] - remaining;
 
-        uart_tx_dma_len[id] = remaining;
+        uint16_t remaining = DMA_GetCurrDataCounter(info->dma_tx);
+        uint16_t sent      = uart_ctx[id].tx_dma_len - remaining;
+
+        uart_ctx[id].tx_dma_len = remaining;
 
         xrbuf_skip(&usart_p[id]->data.tx_rbuf, sent);
 
@@ -721,8 +726,8 @@ void DMA1_Channel2_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMAy_IT_TCx);
 
-        xrbuf_skip(&usart_p[id]->data.tx_rbuf, uart_tx_dma_len[id]);
-        uart_tx_dma_len[id] = 0;
+        xrbuf_skip(&usart_p[id]->data.tx_rbuf, uart_ctx[id].tx_dma_len);
+        uart_ctx[id].tx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         osEventFlagsSet(usart_p[id]->data.event_flag, XSERIAL_EVENT_CAN_WRITE);
@@ -734,7 +739,7 @@ void DMA1_Channel2_IRQHandler(void)
             return;
         }
 
-        uart_tx_dma_len[0] = len;
+        uart_ctx[id].tx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_read_address(&usart_p[id]->data.tx_rbuf);
@@ -756,9 +761,9 @@ void DMA1_Channel3_IRQHandler(void)
         DMA_ClearITPendingBit(DMAy_IT_HTx);
 
         uint16_t remaining = DMA_GetCurrDataCounter(info->dma_rx);
-        uint16_t received  = uart_rx_dma_len[id] - remaining;
+        uint16_t received  = uart_ctx[id].rx_dma_len - remaining;
 
-        uart_rx_dma_len[id] = remaining;
+        uart_ctx[id].rx_dma_len = remaining;
 
         xrbuf_advance(&usart_p[id]->data.rx_rbuf, received);
 
@@ -775,8 +780,8 @@ void DMA1_Channel3_IRQHandler(void)
     {
         DMA_ClearITPendingBit(DMAy_IT_TCx);
 
-        xrbuf_advance(&usart_p[id]->data.rx_rbuf, uart_rx_dma_len[id]);
-        uart_rx_dma_len[id] = 0;
+        xrbuf_advance(&usart_p[id]->data.rx_rbuf, uart_ctx[id].rx_dma_len);
+        uart_ctx[id].rx_dma_len = 0;
 
 #ifdef XHAL_OS_SUPPORTING
         if (xrbuf_get_full(&usart_p[id]->data.rx_rbuf) >
@@ -793,7 +798,7 @@ void DMA1_Channel3_IRQHandler(void)
             return;
         }
 
-        uart_rx_dma_len[id] = len;
+        uart_ctx[id].rx_dma_len = len;
 
         void *addr =
             xrbuf_get_linear_block_write_address(&usart_p[id]->data.rx_rbuf);

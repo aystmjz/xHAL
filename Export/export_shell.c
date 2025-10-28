@@ -45,4 +45,4 @@ static void shell_poll(void)
         shellHandler(&shell, byte);
     }
 }
-POLL_EXPORT_OS(shell_poll, SHELL_POLL_PERIOD_MS, osPriorityNormal, 2048);
+POLL_EXPORT_OS(shell_poll, SHELL_POLL_PERIOD_MS, osPriorityNormal, 1024);

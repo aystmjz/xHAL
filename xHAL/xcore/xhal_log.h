@@ -2,6 +2,7 @@
 #define __XLOG_H
 
 #include "../xlib/xhal_bit.h"
+#include "xhal_common.h"
 #include "xhal_config.h"
 #include "xhal_def.h"
 

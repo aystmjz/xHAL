@@ -48,6 +48,7 @@ typedef struct xhal_i2c_data
     osEventFlagsId_t event_flag;
 #endif
     const char *i2c_name;
+    
     const char *sda_name;
     const char *scl_name;
 } xhal_i2c_data_t;

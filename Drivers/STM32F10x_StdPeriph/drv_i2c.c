@@ -45,6 +45,9 @@ const xhal_i2c_ops_t i2c_ops_driver = {
 
 static xhal_err_t _init(xhal_i2c_t *self)
 {
+    xassert_not_null(self->data.sda_name);
+    xassert_not_null(self->data.scl_name);
+
     xassert_name(_check_pin_name_valid(self->data.sda_name),
                  self->data.sda_name);
     xassert_name(_check_pin_name_valid(self->data.scl_name),
@@ -88,10 +91,6 @@ static xhal_err_t _transfer(xhal_i2c_t *self, xhal_i2c_msg_t *msg)
            .scl_pin  = _get_pin_from_name(self->data.scl_name),
            .clock    = self->data.config.clock,
     };
-
-#ifdef XHAL_OS_SUPPORTING
-    osEventFlagsClear(self->data.event_flag, XI2C_EVENT_DONE);
-#endif
 
     if (msg->flags & XI2C_NOSTART)
     {
