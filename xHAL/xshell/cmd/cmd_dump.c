@@ -1,10 +1,8 @@
-#include "../../xcore/xhal_assert.h"
 #include "../../xcore/xhal_common.h"
-#include "../../xcore/xhal_log.h"
 #include "../../xlib/xhal_bit.h"
 #include "../xhal_shell.h"
 #include <stdlib.h>
-#include <string.h>
+
 
 #define CMD_DUMP_CDISCRIPTION          \
     "dump <addr> <size> [-a | -e]\r\n" \
