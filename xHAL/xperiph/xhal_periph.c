@@ -43,7 +43,6 @@ void xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
     ret               = osMutexAcquire(mutex, osWaitForever);
     xassert(ret == osOK);
 
-    self->lock_count = 0;
     self->mutex      = osMutexNew(&xperiph_mutex_attr);
     xassert_not_null(self->mutex);
 #endif

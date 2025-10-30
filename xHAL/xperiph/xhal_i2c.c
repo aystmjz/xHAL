@@ -110,7 +110,7 @@ xhal_err_t xi2c_transfer(xhal_periph_t *self, xhal_i2c_msg_t *msgs,
 #ifdef XHAL_OS_SUPPORTING
         uint32_t wait_ms  = timeout_ms - elapsed_ms;
         osStatus_t ret_os = (osStatus_t)osEventFlagsWait(
-            i2c->data.event_flag, XI2C_EVENT_DONE, osFlagsWaitAny,
+            i2c->data.event_flag, XI2C_EVENT_DONE, osFlagsWaitAll,
             XOS_MS_TO_TICKS(wait_ms));
         if (ret_os == osErrorTimeout)
         {

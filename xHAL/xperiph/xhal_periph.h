@@ -38,7 +38,6 @@ typedef struct xhal_periph
     xhal_periph_attr_t attr;
 
 #ifdef XHAL_OS_SUPPORTING
-    uint8_t lock_count;
     osMutexId_t mutex;
 #endif
 

@@ -17,8 +17,8 @@ static const osEventFlagsAttr_t xspi_event_flag_attr = {
 
 xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
                      const xhal_spi_ops_t *ops, const char *spi_name,
-                     const char *sck_name, const char *miso_name,
-                     const char *mosi_name, const xhal_spi_config_t *config)
+                     const char *sck_name, const char *mosi_name,
+                     const char *miso_name, const xhal_spi_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(name);
@@ -84,6 +84,19 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
             ret = XHAL_ERR_INVALID;
             goto exit;
         }
+        if ((spi->data.config.direction == XSPI_DIR_2LINE_RX_ONLY ||
+             spi->data.config.direction == XSPI_DIR_1LINE_RX) &&
+            msgs[i].rx_buf == NULL)
+        {
+            ret = XHAL_ERR_INVALID;
+            goto exit;
+        }
+        if (spi->data.config.direction == XSPI_DIR_1LINE_TX &&
+            msgs[i].tx_buf == NULL)
+        {
+            ret = XHAL_ERR_INVALID;
+            goto exit;
+        }
     }
 
     for (uint32_t i = 0; i < num; i++)
@@ -102,9 +115,27 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
         }
 
 #ifdef XHAL_OS_SUPPORTING
-        uint32_t wait_ms  = timeout_ms - elapsed_ms;
+        uint32_t wait_ms    = timeout_ms - elapsed_ms;
+        uint32_t wait_flags = 0;
+
+        switch (spi->data.config.direction)
+        {
+        case XSPI_DIR_2LINE_FULL_DUPLEX:
+            wait_flags = XSPI_EVENT_DONE;
+            break;
+        case XSPI_DIR_2LINE_RX_ONLY:
+        case XSPI_DIR_1LINE_RX:
+            wait_flags = XSPI_EVENT_RX_DONE;
+            break;
+        case XSPI_DIR_1LINE_TX:
+            wait_flags = XSPI_EVENT_TX_DONE;
+            break;
+        default:
+            break;
+        }
+
         osStatus_t ret_os = (osStatus_t)osEventFlagsWait(
-            spi->data.event_flag, XSPI_EVENT_DONE, osFlagsWaitAny,
+            spi->data.event_flag, wait_flags, osFlagsWaitAll,
             XOS_MS_TO_TICKS(wait_ms));
         if (ret_os == osErrorTimeout)
         {
@@ -216,4 +247,21 @@ xhal_err_t xspi_get_config(xhal_periph_t *self, xhal_spi_config_t *config)
     xperiph_unlock(self);
 
     return XHAL_OK;
+}
+
+xhal_err_t xspi_set_direction(xhal_periph_t *self, uint8_t direction)
+{
+
+    xassert_not_null(self);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_SPI);
+
+    xhal_spi_t *spi = XHAL_SPI_CAST(self);
+
+    xperiph_lock(self);
+    xhal_spi_config_t config = spi->data.config;
+    xperiph_unlock(self);
+    config.direction = direction;
+
+    return xspi_get_config(self, &config);
 }

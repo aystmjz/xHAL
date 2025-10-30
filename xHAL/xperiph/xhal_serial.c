@@ -111,7 +111,7 @@ uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
 #ifdef XHAL_OS_SUPPORTING
         uint32_t wait_ms = timeout_ms - elapsed_ms;
         osEventFlagsWait(serial->data.event_flag, XSERIAL_EVENT_CAN_WRITE,
-                         osFlagsWaitAny, XOS_MS_TO_TICKS(wait_ms));
+                         osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
 #endif
     }
 
@@ -157,7 +157,7 @@ uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
 #ifdef XHAL_OS_SUPPORTING
         uint32_t wait_ms = timeout_ms - elapsed_ms;
         osEventFlagsWait(serial->data.event_flag, XSERIAL_EVENT_CAN_READ,
-                         osFlagsWaitAny, XOS_MS_TO_TICKS(wait_ms));
+                         osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
 #endif
     }
 

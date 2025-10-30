@@ -109,17 +109,6 @@ static xhal_err_t _init(xhal_spi_t *self)
     const spi_hw_info_t *info = _find_spi_info(self->data.spi_name);
     spi_p[info->id]           = self;
 
-    _spi_gpio_msp_init(self);
-    ret = _config(self, &self->data.config);
-    _spi_irq_msp_init(self);
-
-    return ret;
-}
-
-static xhal_err_t _config(xhal_spi_t *self, const xhal_spi_config_t *config)
-{
-    const spi_hw_info_t *info = _find_spi_info(self->data.spi_name);
-
     if (info->spi_clk == RCC_APB2Periph_SPI1)
     {
         RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
@@ -129,14 +118,42 @@ static xhal_err_t _config(xhal_spi_t *self, const xhal_spi_config_t *config)
         RCC_APB1PeriphClockCmd(info->spi_clk, ENABLE);
     }
 
+    _spi_gpio_msp_init(self);
+    ret = _config(self, &self->data.config);
+    _spi_irq_msp_init(self);
+
+    return ret;
+}
+
+static xhal_err_t _config(xhal_spi_t *self, const xhal_spi_config_t *config)
+{
+
+    const spi_hw_info_t *info = _find_spi_info(self->data.spi_name);
+
+    SPI_Cmd(info->spi, DISABLE);
+
     SPI_InitTypeDef SPI_InitStructure;
-    SPI_InitStructure.SPI_Mode      = SPI_Mode_Master;
-    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
-    SPI_InitStructure.SPI_DataSize  = (config->data_bits == XSPI_DATA_BITS_8)
-                                          ? SPI_DataSize_8b
-                                          : SPI_DataSize_16b;
-    SPI_InitStructure.SPI_FirstBit  = SPI_FirstBit_MSB;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
+    SPI_InitStructure.SPI_Mode     = SPI_Mode_Master;
+    SPI_InitStructure.SPI_DataSize = (config->data_bits == XSPI_DATA_BITS_8)
+                                         ? SPI_DataSize_8b
+                                         : SPI_DataSize_16b;
+    switch (config->direction)
+    {
+    case XSPI_DIR_2LINE_FULL_DUPLEX:
+        SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+        break;
+    case XSPI_DIR_2LINE_RX_ONLY:
+        SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_RxOnly;
+        break;
+    case XSPI_DIR_1LINE_RX:
+        SPI_InitStructure.SPI_Direction = SPI_Direction_1Line_Rx;
+        break;
+    case XSPI_DIR_1LINE_TX:
+        SPI_InitStructure.SPI_Direction = SPI_Direction_1Line_Tx;
+        break;
+    default:
+        break;
+    }
     switch (config->mode)
     {
     case XSPI_MODE_0: /* CPOL = 0, CPHA = 0 */
@@ -158,9 +175,16 @@ static xhal_err_t _config(xhal_spi_t *self, const xhal_spi_config_t *config)
     default:
         break;
     }
-    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
+    SPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_MSB;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
+    SPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;
     SPI_Init(info->spi, &SPI_InitStructure);
-    SPI_Cmd(info->spi, ENABLE);
+
+    if (config->direction != XSPI_DIR_2LINE_RX_ONLY &&
+        config->direction != XSPI_DIR_1LINE_RX)
+    {
+        SPI_Cmd(info->spi, ENABLE);
+    }
 
     return XHAL_OK;
 }
@@ -177,6 +201,7 @@ static xhal_err_t _transfer(xhal_spi_t *self, xhal_spi_msg_t *msg)
     spi_ctx[id].tx_index = 0;
 
     SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, ENABLE);
+    SPI_Cmd(info->spi, ENABLE);
 
     return XHAL_OK;
 }
@@ -186,25 +211,35 @@ static void _spi_gpio_msp_init(xhal_spi_t *self)
     const spi_hw_info_t *info = _find_spi_info(self->data.spi_name);
 
     RCC_APB2PeriphClockCmd(info->sck_clk, ENABLE);
-    RCC_APB2PeriphClockCmd(info->miso_clk, ENABLE);
     RCC_APB2PeriphClockCmd(info->mosi_clk, ENABLE);
 
     GPIO_InitTypeDef GPIO_InitStructure;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-    GPIO_InitStructure.GPIO_Pin   = info->mosi_pin;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(info->mosi_port, &GPIO_InitStructure);
-    GPIO_InitStructure.GPIO_Pin = info->sck_pin;
+    GPIO_InitStructure.GPIO_Pin   = info->sck_pin;
     GPIO_Init(info->sck_port, &GPIO_InitStructure);
 
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_InitStructure.GPIO_Pin  = info->miso_pin;
-    GPIO_Init(info->miso_port, &GPIO_InitStructure);
+    switch (self->data.config.direction)
+    {
+    case XSPI_DIR_2LINE_FULL_DUPLEX:
+    case XSPI_DIR_2LINE_RX_ONLY:
+        RCC_APB2PeriphClockCmd(info->miso_clk, ENABLE);
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+        GPIO_InitStructure.GPIO_Pin  = info->miso_pin;
+        GPIO_Init(info->miso_port, &GPIO_InitStructure);
+    case XSPI_DIR_1LINE_RX:
+    case XSPI_DIR_1LINE_TX:
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+        GPIO_InitStructure.GPIO_Pin  = info->mosi_pin;
+        GPIO_Init(info->mosi_port, &GPIO_InitStructure);
+        break;
+    default:
+        break;
+    }
 }
 
 static void _spi_irq_msp_init(xhal_spi_t *self)
 {
-
     const spi_hw_info_t *info = _find_spi_info(self->data.spi_name);
 
     SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_RXNE, ENABLE);
@@ -250,6 +285,7 @@ void SPI1_IRQHandler(void)
 {
     const spi_hw_info_t *info = &spi_table[0];
     const uint8_t id          = info->id;
+
     if (SPI_I2S_GetITStatus(info->spi, SPI_I2S_IT_RXNE) == SET)
     {
         uint16_t data_read = SPI_I2S_ReceiveData(info->spi);
@@ -266,8 +302,9 @@ void SPI1_IRQHandler(void)
         spi_ctx[id].rx_index++;
         if (spi_ctx[id].rx_index >= spi_ctx[id].len)
         {
+            SPI_Cmd(info->spi, DISABLE);
 #ifdef XHAL_OS_SUPPORTING
-            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_DONE);
+            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_RX_DONE);
 #endif
         }
     }
@@ -290,6 +327,9 @@ void SPI1_IRQHandler(void)
         if (spi_ctx[id].tx_index >= spi_ctx[id].len)
         {
             SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
+#ifdef XHAL_OS_SUPPORTING
+            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#endif
         }
     }
 }
@@ -298,6 +338,7 @@ void SPI2_IRQHandler(void)
 {
     const spi_hw_info_t *info = &spi_table[1];
     const uint8_t id          = info->id;
+
     if (SPI_I2S_GetITStatus(info->spi, SPI_I2S_IT_RXNE) == SET)
     {
         uint16_t data_read = SPI_I2S_ReceiveData(info->spi);
@@ -314,8 +355,9 @@ void SPI2_IRQHandler(void)
         spi_ctx[id].rx_index++;
         if (spi_ctx[id].rx_index >= spi_ctx[id].len)
         {
+            SPI_Cmd(info->spi, DISABLE);
 #ifdef XHAL_OS_SUPPORTING
-            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_DONE);
+            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_RX_DONE);
 #endif
         }
     }
@@ -338,6 +380,9 @@ void SPI2_IRQHandler(void)
         if (spi_ctx[id].tx_index >= spi_ctx[id].len)
         {
             SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
+#ifdef XHAL_OS_SUPPORTING
+            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#endif
         }
     }
 }
