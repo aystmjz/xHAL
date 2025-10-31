@@ -70,7 +70,7 @@ xhal_err_t xi2c_transfer(xhal_periph_t *self, xhal_i2c_msg_t *msgs,
         return XHAL_OK;
 
     xhal_err_t ret               = XHAL_OK;
-    xhal_i2c_t *i2c              = XHAL_I2C_CAST(self);
+    xhal_i2c_t *i2c              = XI2C_CAST(self);
     xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
 
     xperiph_lock(self);
@@ -199,7 +199,7 @@ xhal_err_t xi2c_set_config(xhal_periph_t *self, xhal_i2c_config_t *config)
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_I2C);
 
     xhal_err_t ret  = XHAL_OK;
-    xhal_i2c_t *i2c = XHAL_I2C_CAST(self);
+    xhal_i2c_t *i2c = XI2C_CAST(self);
 
     xperiph_lock(self);
     ret = i2c->ops->config(i2c, config);
@@ -220,7 +220,7 @@ xhal_err_t xi2c_get_config(xhal_periph_t *self, xhal_i2c_config_t *config)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_I2C);
 
-    xhal_i2c_t *i2c = XHAL_I2C_CAST(self);
+    xhal_i2c_t *i2c = XI2C_CAST(self);
 
     xperiph_lock(self);
     *config = i2c->data.config;

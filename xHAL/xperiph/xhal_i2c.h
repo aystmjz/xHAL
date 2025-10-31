@@ -61,7 +61,7 @@ typedef struct xhal_i2c
     xhal_i2c_data_t data;
 } xhal_i2c_t;
 
-#define XHAL_I2C_CAST(_dev) ((xhal_i2c_t *)_dev)
+#define XI2C_CAST(_dev) ((xhal_i2c_t *)_dev)
 
 xhal_err_t xi2c_inst(xhal_i2c_t *self, const char *name,
                      const xhal_i2c_ops_t *ops, const char *i2c_name,

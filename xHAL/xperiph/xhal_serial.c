@@ -6,6 +6,18 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+XLOG_TAG("xSerial");
+
+#define IS_XSERIAL_DATA_BITS(BITS) \
+    (((BITS) == XSERIAL_DATA_BITS_8) || ((BITS) == XSERIAL_DATA_BITS_9))
+
+#define IS_XSERIAL_STOP_BITS(BITS) \
+    (((BITS) == XSERIAL_STOP_BITS_1) || ((BITS) == XSERIAL_STOP_BITS_2))
+
+#define IS_XSERIAL_PARITY(PARITY)                                             \
+    (((PARITY) == XSERIAL_PARITY_NONE) || ((PARITY) == XSERIAL_PARITY_ODD) || \
+     ((PARITY) == XSERIAL_PARITY_EVEN))
+
 #ifdef XHAL_OS_SUPPORTING
 static const osMutexAttr_t xserial_mutex_attr = {
     .name      = "xserial_mutex",
@@ -21,8 +33,6 @@ static const osEventFlagsAttr_t xserial_event_flag_attr = {
 };
 #endif
 
-XLOG_TAG("xSerial");
-
 xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
                         const xhal_serial_ops_t *ops, const char *serial_name,
                         const xhal_serial_config_t *config, void *tx_buff,
@@ -33,6 +43,9 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
     xassert_not_null(serial_name);
     xassert_not_null(config);
     xassert_ptr_struct_not_null(ops, name);
+    xassert_name(IS_XSERIAL_DATA_BITS(config->data_bits), name);
+    xassert_name(IS_XSERIAL_STOP_BITS(config->stop_bits), name);
+    xassert_name(IS_XSERIAL_PARITY(config->parity), name);
 
     xhal_serial_t *serial            = self;
     xhal_periph_attr_t periph_config = {
@@ -86,7 +99,7 @@ uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial        = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial        = XSERIAL_CAST(self);
     xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
     uint32_t written             = 0;
 
@@ -132,7 +145,7 @@ uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial        = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial        = XSERIAL_CAST(self);
     xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
     uint32_t read                = 0;
 
@@ -179,7 +192,7 @@ uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
     uint32_t peeked       = 0;
 
 #ifdef XHAL_OS_SUPPORTING
@@ -204,7 +217,7 @@ uint32_t xserial_discard(xhal_periph_t *self, uint32_t size)
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
     uint32_t skipped      = 0;
 
 #ifdef XHAL_OS_SUPPORTING
@@ -232,7 +245,7 @@ uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
     uint8_t found         = 0;
 
 #ifdef XHAL_OS_SUPPORTING
@@ -255,7 +268,7 @@ xhal_err_t xserial_clear(xhal_periph_t *self)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
 
 #ifdef XHAL_OS_SUPPORTING
     osStatus_t ret_os = osOK;
@@ -313,7 +326,7 @@ uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...)
     XPERIPH_CHECK_INIT(self, 0);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
     int32_t ret           = 0;
 
 #ifdef XHAL_OS_SUPPORTING
@@ -402,7 +415,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
 
 #ifdef XHAL_OS_SUPPORTING
     osStatus_t ret_os = osOK;
@@ -435,7 +448,7 @@ xhal_err_t xserial_get_config(xhal_periph_t *self, xhal_serial_config_t *config)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
 
     xperiph_lock(self);
     *config = serial->data.config;
@@ -448,10 +461,13 @@ xhal_err_t xserial_set_config(xhal_periph_t *self, xhal_serial_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
+    xassert_name(IS_XSERIAL_DATA_BITS(config->data_bits), self->attr.name);
+    xassert_name(IS_XSERIAL_STOP_BITS(config->stop_bits), self->attr.name);
+    xassert_name(IS_XSERIAL_PARITY(config->parity), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
     xhal_err_t ret        = XHAL_OK;
 
     xperiph_lock(self);
@@ -471,7 +487,7 @@ xhal_err_t xserial_set_baudrate(xhal_periph_t *self, uint32_t baudrate)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
-    xhal_serial_t *serial = XHAL_SERIAL_CAST(self);
+    xhal_serial_t *serial = XSERIAL_CAST(self);
 
     xperiph_lock(self);
     xhal_serial_config_t config = serial->data.config;

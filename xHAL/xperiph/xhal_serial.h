@@ -89,7 +89,7 @@ typedef struct xhal_serial
     xhal_serial_data_t data;
 } xhal_serial_t;
 
-#define XHAL_SERIAL_CAST(_dev) ((xhal_serial_t *)_dev)
+#define XSERIAL_CAST(_dev) ((xhal_serial_t *)_dev)
 
 xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
                         const xhal_serial_ops_t *ops, const char *serial_name,

@@ -4,6 +4,13 @@
 
 XLOG_TAG("xPin");
 
+#define IS_XPIN_MODE(MODE)                                                \
+    (((MODE) == XPIN_MODE_INPUT) || ((MODE) == XPIN_MODE_INPUT_PULLUP) || \
+     ((MODE) == XPIN_MODE_INPUT_PULLDOWN) ||                              \
+     ((MODE) == XPIN_MODE_OUTPUT_PP) || ((MODE) == XPIN_MODE_OUTPUT_OD))
+
+#define IS_XPIN_STATE(STATE) (((STATE) == XPIN_LOW) || ((STATE) == XPIN_HIGH))
+
 xhal_err_t xpin_inst(xhal_pin_t *self, const char *name,
                      const xhal_pin_ops_t *ops, const char *pin_name,
                      xhal_pin_mode_t mode, xhal_pin_state_t status)
@@ -12,7 +19,8 @@ xhal_err_t xpin_inst(xhal_pin_t *self, const char *name,
     xassert_not_null(name);
     xassert_not_null(pin_name);
     xassert_ptr_struct_not_null(ops, name);
-    xassert_name(mode < XPIN_MODE_MAX, name);
+    xassert_name(IS_XPIN_MODE(mode), name);
+    xassert_name(IS_XPIN_STATE(status), name);
 
     xhal_pin_t *pin = self;
 
@@ -40,7 +48,7 @@ xhal_err_t xpin_inst(xhal_pin_t *self, const char *name,
 xhal_err_t xpin_set_mode(xhal_periph_t *self, xhal_pin_mode_t mode)
 {
     xassert_not_null(self);
-    xassert_name(mode < XPIN_MODE_MAX, self->attr.name);
+    xassert_name(IS_XPIN_MODE(mode), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_PIN);
 
@@ -84,6 +92,7 @@ xhal_pin_state_t xpin_read(xhal_periph_t *self)
 xhal_err_t xpin_write(xhal_periph_t *self, xhal_pin_state_t status)
 {
     xassert_not_null(self);
+    xassert_name(IS_XPIN_STATE(status), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_PIN);
 

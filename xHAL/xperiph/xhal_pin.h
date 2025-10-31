@@ -11,9 +11,7 @@ typedef enum xhal_pin_mode
     XPIN_MODE_INPUT_PULLUP,
     XPIN_MODE_INPUT_PULLDOWN,
     XPIN_MODE_OUTPUT_PP,
-    XPIN_MODE_OUTPUT_OD,
-
-    XPIN_MODE_MAX
+    XPIN_MODE_OUTPUT_OD
 } xhal_pin_mode_t;
 
 typedef enum xhal_pin_state

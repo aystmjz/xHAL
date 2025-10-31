@@ -6,6 +6,18 @@
 
 XLOG_TAG("xSPI");
 
+#define IS_XSPI_MODE(MOD)                                \
+    (((MOD) == XSPI_MODE_0) || ((MOD) == XSPI_MODE_1) || \
+     ((MOD) == XSPI_MODE_2) || ((MOD) == XSPI_MODE_3))
+
+#define IS_XSPI_DIRECTION(DIR)                                            \
+    (((DIR) == XSPI_DIR_2LINE_FULL_DUPLEX) ||                             \
+     ((DIR) == XSPI_DIR_2LINE_RX_ONLY) || ((DIR) == XSPI_DIR_1LINE_RX) || \
+     ((DIR) == XSPI_DIR_1LINE_TX))
+
+#define IS_XSPI_DATA_BITS(BITS) \
+    (((BITS) == XSPI_DATA_BITS_8) || ((BITS) == XSPI_DATA_BITS_16))
+
 #ifdef XHAL_OS_SUPPORTING
 static const osEventFlagsAttr_t xspi_event_flag_attr = {
     .name      = "xspi_event_flag",
@@ -25,6 +37,9 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
     xassert_not_null(spi_name);
     xassert_not_null(config);
     xassert_ptr_struct_not_null(ops, name);
+    xassert_name(IS_XSPI_MODE(config->mode), name);
+    xassert_name(IS_XSPI_DIRECTION(config->direction), name);
+    xassert_name(IS_XSPI_DATA_BITS(config->data_bits), name);
 
     xhal_spi_t *spi                  = self;
     xhal_periph_attr_t periph_config = {
@@ -71,7 +86,7 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
         return XHAL_OK;
 
     xhal_err_t ret               = XHAL_OK;
-    xhal_spi_t *spi              = XHAL_SPI_CAST(self);
+    xhal_spi_t *spi              = XSPI_CAST(self);
     xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
 
     xperiph_lock(self);
@@ -215,11 +230,14 @@ xhal_err_t xspi_set_config(xhal_periph_t *self, xhal_spi_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
+    xassert_name(IS_XSPI_MODE(config->mode), self->attr.name);
+    xassert_name(IS_XSPI_DIRECTION(config->direction), self->attr.name);
+    xassert_name(IS_XSPI_DATA_BITS(config->data_bits), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_SPI);
 
     xhal_err_t ret  = XHAL_OK;
-    xhal_spi_t *spi = XHAL_SPI_CAST(self);
+    xhal_spi_t *spi = XSPI_CAST(self);
 
     xperiph_lock(self);
     ret = spi->ops->config(spi, config);
@@ -240,7 +258,7 @@ xhal_err_t xspi_get_config(xhal_periph_t *self, xhal_spi_config_t *config)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_SPI);
 
-    xhal_spi_t *spi = XHAL_SPI_CAST(self);
+    xhal_spi_t *spi = XSPI_CAST(self);
 
     xperiph_lock(self);
     *config = spi->data.config;
@@ -253,10 +271,11 @@ xhal_err_t xspi_set_direction(xhal_periph_t *self, uint8_t direction)
 {
 
     xassert_not_null(self);
+    xassert_name(IS_XSPI_DIRECTION(direction), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_SPI);
 
-    xhal_spi_t *spi = XHAL_SPI_CAST(self);
+    xhal_spi_t *spi = XSPI_CAST(self);
 
     xperiph_lock(self);
     xhal_spi_config_t config = spi->data.config;

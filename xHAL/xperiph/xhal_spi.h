@@ -81,7 +81,7 @@ typedef struct xhal_spi
     xhal_spi_data_t data;
 } xhal_spi_t;
 
-#define XHAL_SPI_CAST(_dev) ((xhal_spi_t *)_dev)
+#define XSPI_CAST(_dev) ((xhal_spi_t *)_dev)
 
 xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
                      const xhal_spi_ops_t *ops, const char *spi_name,
