@@ -7,7 +7,7 @@
 
 #define XTIM_CONFIG_NORMAL(_period, _prescaler, ...) \
     {                                                \
-        .mode = XTIM_MODE_NORMAL, .config.normal = { \
+        .mode = XTIM_MODE_NORMAL, .setting.normal = { \
             .period    = _period,                    \
             .prescaler = _prescaler,                 \
             .compare   = {__VA_ARGS__}               \
@@ -33,7 +33,7 @@
 
 #define XTIM_CONFIG_PWM(_period, _prescaler, _channel_mask, ...) \
     {                                                            \
-        .mode = XTIM_MODE_PWM, .config.pwm = {                   \
+        .mode = XTIM_MODE_PWM, .setting.pwm = {                   \
             .period       = _period,                             \
             .prescaler    = _prescaler,                          \
             .channels     = {__VA_ARGS__},                       \
@@ -48,7 +48,7 @@
 
 #define XTIM_CONFIG_ENCODER(_ch1_pol, _ch1_filt, _ch2_pol, _ch2_filt) \
     {                                                                 \
-        .mode = XTIM_MODE_ENCODER, .config.encoder = {                \
+        .mode = XTIM_MODE_ENCODER, .setting.encoder = {                \
             .channel1 = {.polarity = _ch1_pol, .filter = _ch1_filt},  \
             .channel2 = {.polarity = _ch2_pol, .filter = _ch2_filt}   \
         }                                                             \
@@ -64,7 +64,6 @@
 #define XTIM_CHANNEL_2         ((uint8_t)(1U << 1)) /* 通道 2 */
 #define XTIM_CHANNEL_3         ((uint8_t)(1U << 2)) /* 通道 3 */
 #define XTIM_CHANNEL_4         ((uint8_t)(1U << 3)) /* 通道 4 */
-#define XTIM_CHANNEL_MASK(...) (0U | __VA_ARGS__)
 
 enum xhal_tim_oc_idle
 {

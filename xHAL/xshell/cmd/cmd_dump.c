@@ -2,7 +2,7 @@
 #include "../../xlib/xhal_bit.h"
 #include "../xhal_shell.h"
 #include <stdlib.h>
-
+#include <string.h>
 
 #define CMD_DUMP_CDISCRIPTION          \
     "dump <addr> <size> [-a | -e]\r\n" \
