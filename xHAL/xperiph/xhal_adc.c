@@ -6,6 +6,9 @@
 
 XLOG_TAG("xADC");
 
+#define IS_XADC_MODE(MODE) \
+    (((MODE) == XADC_MODE_REALTIME) || ((MODE) == XADC_MODE_CONTINUOUS))
+
 #define IS_XADC_RESOLUTION(RES)                                              \
     (((RES) == XADC_RESOLUTION_8BIT) || ((RES) == XADC_RESOLUTION_10BIT) ||  \
      ((RES) == XADC_RESOLUTION_12BIT) || ((RES) == XADC_RESOLUTION_14BIT) || \
@@ -32,6 +35,7 @@ xhal_err_t xadc_inst(xhal_adc_t *self, const char *name,
     xassert_not_null(data_buff);
     xassert_ptr_struct_not_null(ops, name);
     xassert_name(IS_XADC_RESOLUTION(config->resolution), name);
+    xassert_name(channel_mask != 0, name);
     xassert_name(config->reference_voltage > 0, name);
 
     xhal_adc_t *adc                  = self;
@@ -81,12 +85,16 @@ uint32_t xadc_read_raw(xhal_periph_t *self, uint16_t samples,
     if (samples == 0 || channel_mask == 0)
         return 0;
 
+    if ((XADC_CAST(self)->data.channel_mask & channel_mask) != channel_mask)
+        return 0;
+
     uint8_t channel_count = 0;
-    uint16_t temp_mask    = channel_mask;
-    while (temp_mask)
+    for (uint8_t i = 0; i < 16; i++)
     {
-        channel_count += temp_mask & 1;
-        temp_mask >>= 1;
+        if (channel_mask & (1U << i))
+        {
+            channel_count++;
+        }
     }
 
     uint16_t *buffers[channel_count];
@@ -106,6 +114,13 @@ uint32_t xadc_read_raw(xhal_periph_t *self, uint16_t samples,
     uint32_t samples_read        = 0;
 
     xperiph_lock(self);
+    if (adc->data.config.mode == XADC_MODE_REALTIME)
+    {
+        xhal_err_t ret = adc->ops->trigger_single(adc, samples);
+        if (ret != XHAL_OK)
+            goto exit;
+    }
+
     while (1)
     {
         uint16_t *current_buffers[channel_count];
@@ -131,7 +146,7 @@ uint32_t xadc_read_raw(xhal_periph_t *self, uint16_t samples,
                          osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
 #endif
     }
-
+exit:
     xperiph_unlock(self);
 
     return samples_read;
@@ -143,19 +158,23 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
 {
     xassert_not_null(self);
     xassert_not_null(buffer);
-    xassert_name(sizeof(float) == sizeof(uint32_t), "float size error");
+    xassert_name(sizeof(float) == sizeof(uint32_t), "float size not support");
     XPERIPH_CHECK_INIT(self, 0);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_ADC);
 
     if (samples == 0 || channel_mask == 0)
         return 0;
 
+    if ((XADC_CAST(self)->data.channel_mask & channel_mask) != channel_mask)
+        return 0;
+
     uint8_t channel_count = 0;
-    uint16_t temp_mask    = channel_mask;
-    while (temp_mask)
+    for (uint8_t i = 0; i < 16; i++)
     {
-        channel_count += temp_mask & 1;
-        temp_mask >>= 1;
+        if (channel_mask & (1 << i))
+        {
+            channel_count++;
+        }
     }
 
     uint16_t *buffers[channel_count];
@@ -174,6 +193,16 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
     uint32_t samples_read        = 0;
 
     xperiph_lock(self);
+    float scale_factor = adc->data.config.reference_voltage /
+                         ((1 << adc->data.config.resolution) - 1);
+
+    if (adc->data.config.mode == XADC_MODE_REALTIME)
+    {
+        xhal_err_t ret = adc->ops->trigger_single(adc, samples);
+        if (ret != XHAL_OK)
+            goto exit;
+    }
+
     while (1)
     {
         uint16_t *current_buffers[channel_count];
@@ -199,8 +228,7 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
                          osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
 #endif
     }
-    float scale_factor = adc->data.config.reference_voltage /
-                         ((1 << adc->data.config.resolution) - 1);
+exit:
     xperiph_unlock(self);
 
     if (samples_read > 0)
@@ -261,8 +289,10 @@ xhal_err_t xadc_get_status(xhal_periph_t *self, xadc_status_t *status)
     xhal_adc_t *adc = XADC_CAST(self);
 
     xperiph_lock(self);
-    status->cache_used = xrbuf_get_full(&adc->data.data_rbuf);
-    status->cache_free = xrbuf_get_free(&adc->data.data_rbuf);
+    status->cache_used     = xrbuf_get_full(&adc->data.data_rbuf);
+    status->cache_free     = xrbuf_get_free(&adc->data.data_rbuf);
+    status->overflow_count = adc->data.overflow_count;
+    status->sample_count   = adc->data.sample_count;
     xperiph_unlock(self);
 
     return XHAL_OK;
@@ -307,6 +337,27 @@ xhal_err_t xadc_set_config(xhal_periph_t *self, xhal_adc_config_t *config)
     return ret;
 }
 
+xhal_err_t xadc_set_mode(xhal_periph_t *self, uint8_t mode)
+{
+    xassert_not_null(self);
+    xassert_name(IS_XADC_MODE(mode), self->attr.name);
+    XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
+    XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_ADC);
+
+    xhal_adc_t *adc = XADC_CAST(self);
+
+    xperiph_lock(self);
+    xhal_adc_config_t config = adc->data.config;
+    xperiph_unlock(self);
+    if (mode == config.mode)
+    {
+        return XHAL_OK;
+    }
+    config.mode = mode;
+
+    return xadc_set_config(self, &config);
+}
+
 xhal_err_t xadc_set_reference_voltage(xhal_periph_t *self, float voltage)
 {
     xassert_not_null(self);
@@ -319,6 +370,10 @@ xhal_err_t xadc_set_reference_voltage(xhal_periph_t *self, float voltage)
     xperiph_lock(self);
     xhal_adc_config_t config = adc->data.config;
     xperiph_unlock(self);
+    if (voltage == config.reference_voltage)
+    {
+        return XHAL_OK;
+    }
     config.reference_voltage = voltage;
 
     return xadc_set_config(self, &config);
@@ -337,21 +392,4 @@ xhal_err_t xadc_calibrate(xhal_periph_t *self)
     xperiph_unlock(self);
 
     return ret;
-}
-
-// 内部函数：用于中断服务程序向环形缓冲区写入数据
-void xadc_data_ready_isr(xhal_adc_t *adc, const uint16_t *data, uint32_t size)
-{
-    xassert_not_null(adc);
-    xassert_not_null(data);
-
-    uint32_t written =
-        xrbuf_write(&adc->data.data_rbuf, data, size * sizeof(uint16_t));
-
-#ifdef XHAL_OS_SUPPORTING
-    if (written > 0)
-    {
-        osEventFlagsSet(adc->data.event_flag, XADC_EVENT_DATA_READY);
-    }
-#endif
 }
