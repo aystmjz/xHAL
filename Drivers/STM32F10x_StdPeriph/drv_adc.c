@@ -1,10 +1,7 @@
+#include "drv_util.h"
 #include "xhal_adc.h"
-#include "xhal_assert.h"
-#include "xhal_log.h"
-#include "xhal_time.h"
 #include <ctype.h>
 #include <string.h>
-#include XHAL_CMSIS_DEVICE_HEADER
 
 XLOG_TAG("xDriverADC");
 
@@ -399,7 +396,6 @@ void DMA1_Channel1_IRQHandler(void)
         if (adc->data.config.mode == XADC_MODE_REALTIME &&
             adc->data.sample_count >= adc_ctx[info->id].target_samples)
         {
-
             DMA_Cmd(info->dma, DISABLE);
             _stop_continuous(adc);
             return;

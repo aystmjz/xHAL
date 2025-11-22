@@ -1,11 +1,7 @@
-#include "UART.h"
-#include "xhal_assert.h"
-#include "xhal_log.h"
+#include "drv_util.h"
 #include "xhal_spi.h"
-#include "xhal_time.h"
 #include <ctype.h>
 #include <string.h>
-#include XHAL_CMSIS_DEVICE_HEADER
 
 XLOG_TAG("xDriverSPIhw");
 

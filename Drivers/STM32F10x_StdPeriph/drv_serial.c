@@ -1,13 +1,8 @@
-#include "xhal_assert.h"
-#include "xhal_log.h"
-#include "xhal_os.h"
+#include "drv_util.h"
 #include "xhal_ringbuf.h"
 #include "xhal_serial.h"
-#include "xhal_time.h"
 #include <ctype.h>
 #include <string.h>
-
-#include XHAL_CMSIS_DEVICE_HEADER
 
 XLOG_TAG("xDriverSerial");
 
@@ -40,8 +35,9 @@ static const uart_hw_info_t *_find_uart_info(const char *name);
 static void _uart_gpio_msp_init(xhal_serial_t *self);
 static void _uart_dma_irq_msp_init(xhal_serial_t *self);
 
-static void _dma_config_transfer(DMA_Channel_TypeDef *DMA_CHx, u32 periph_addr,
-                                 u32 mem_addr, u16 data_len);
+static void inline _dma_config_transfer(DMA_Channel_TypeDef *DMA_CHx,
+                                        u32 periph_addr, u32 mem_addr,
+                                        u16 data_len);
 
 typedef struct uart_hw_info
 {
@@ -67,6 +63,7 @@ typedef struct uart_hw_info
     uint32_t rx_port_clk; /* RX 端口时钟 */
 
     uint32_t uart_clk; /* USART 外设时钟 */
+    uint32_t dma_clk;  /* DMA 外设时钟 */
 } uart_hw_info_t;
 
 static const uart_hw_info_t uart_table[] = {
@@ -88,6 +85,7 @@ static const uart_hw_info_t uart_table[] = {
         .tx_port_clk     = RCC_APB2Periph_GPIOA,
         .rx_port_clk     = RCC_APB2Periph_GPIOA,
         .uart_clk        = RCC_APB2Periph_USART1,
+        .dma_clk         = RCC_AHBPeriph_DMA1,
     },
     {
         .id              = 1,
@@ -107,6 +105,7 @@ static const uart_hw_info_t uart_table[] = {
         .tx_port_clk     = RCC_APB2Periph_GPIOA,
         .rx_port_clk     = RCC_APB2Periph_GPIOA,
         .uart_clk        = RCC_APB1Periph_USART2,
+        .dma_clk         = RCC_AHBPeriph_DMA1,
     },
     {
         .id              = 2,
@@ -126,6 +125,7 @@ static const uart_hw_info_t uart_table[] = {
         .tx_port_clk     = RCC_APB2Periph_GPIOB,
         .rx_port_clk     = RCC_APB2Periph_GPIOB,
         .uart_clk        = RCC_APB1Periph_USART3,
+        .dma_clk         = RCC_AHBPeriph_DMA1,
     },
 };
 
@@ -133,8 +133,7 @@ static xhal_err_t _init(xhal_serial_t *self)
 {
     xassert_name(_check_uart_name_valid(self->data.name), self->data.name);
 
-    xhal_err_t ret = XHAL_OK;
-
+    xhal_err_t ret                = XHAL_OK;
     const uart_hw_info_t *info    = _find_uart_info(self->data.name);
     uart_p[info->id]              = self;
     uart_ctx[info->id].rx_dma_len = self->data.rx_rbuf.size;
@@ -277,8 +276,9 @@ static void _uart_gpio_msp_init(xhal_serial_t *self)
     GPIO_Init(info->rx_port, &GPIO_InitStructure);
 }
 
-static void _dma_config_transfer(DMA_Channel_TypeDef *DMA_CHx, u32 periph_addr,
-                                 u32 mem_addr, u16 data_len)
+static void inline _dma_config_transfer(DMA_Channel_TypeDef *DMA_CHx,
+                                        u32 periph_addr, u32 mem_addr,
+                                        u16 data_len)
 {
     DMA_CHx->CCR &= ~DMA_CCR1_EN; /* 禁用 DMA 通道 */
     DMA_CHx->CPAR  = periph_addr; /* 配置外设地址 */
@@ -291,7 +291,7 @@ static void _uart_dma_irq_msp_init(xhal_serial_t *self)
 {
     const uart_hw_info_t *info = _find_uart_info(self->data.name);
 
-    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+    RCC_AHBPeriphClockCmd(info->dma_clk, ENABLE);
 
     /* DMA (TX) */
     DMA_InitTypeDef DMA_InitStructure;
