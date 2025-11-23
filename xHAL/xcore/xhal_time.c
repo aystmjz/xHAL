@@ -9,6 +9,20 @@ XLOG_TAG("xTime");
 #define XTIME_INVALID_TS    (0)
 #define XTIME_ALLOWED_DRIFT (5)
 
+#ifndef XTIME_USE_DWT_DELAY
+#define XTIME_USE_DWT_DELAY (0)
+#endif
+
+#if XTIME_USE_DWT_DELAY != 0
+#include XHAL_CMSIS_DEVICE_HEADER
+
+#if !defined(DWT) || !defined(DWT_CTRL_CYCCNTENA_Msk)
+#error \
+    "DWT cycle counter is not available on this MCU, disable XTIME_USE_DWT_DELAY"
+#endif
+
+#endif
+
 #ifndef XTIME_AUTO_SYNC_ENABLE
 #define XTIME_AUTO_SYNC_ENABLE (1)
 #endif
@@ -80,7 +94,6 @@ xhal_tick_ms_t xtime_get_tick_ms(void)
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
-
     return ret;
 }
 
@@ -112,19 +125,46 @@ xhal_tick_sec_t xtime_get_tick_sec(void)
 
 void xtime_delay_us(uint32_t delay_us)
 {
+#if XTIME_USE_DWT_DELAY
+    static uint8_t initialized = 0;
+
+    if (!initialized)
+    {
+        CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+
+        DWT->CYCCNT = 0;
+        DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+        initialized = 1;
+    }
+
+    uint32_t clk   = (XTIME_CPU_FREQ_HZ / 1000000U);
+    uint32_t start = DWT->CYCCNT;
+    uint32_t ticks = delay_us * clk;
+
+    while ((DWT->CYCCNT - start) < ticks)
+    {
+    }
+#else
     uint32_t count = delay_us * (XTIME_CPU_FREQ_HZ / 8U / 1000000U);
-    do
+    while (count--)
     {
         __NOP();
-    } while (count--);
+    }
+#endif
 }
 
 void xtime_delay_ms(uint32_t delay_ms)
 {
+#ifdef XHAL_OS_SUPPORTING
+    osDelay(XOS_MS_TO_TICKS(delay_ms));
+#else
     xhal_tick_ms_t start = xtime_get_tick_ms();
     while ((xtime_get_tick_ms() - start) < delay_ms)
     {
+        __NOP();
     }
+#endif
 }
 
 void xtime_delay_s(uint32_t delay_s)

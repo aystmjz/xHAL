@@ -6,6 +6,22 @@
 #include "xhal_std.h"
 #include <time.h>
 
+#ifdef XHAL_OS_SUPPORTING
+#if (XOS_TICK_RATE_HZ == 0)
+#error "XOS_TICK_RATE_HZ must not be 0"
+#endif
+
+#if (1000 % XOS_TICK_RATE_HZ) != 0
+#warning \
+    "XOS_TICK_RATE_HZ does not evenly divide 1000, delay may lose precision, using 64-bit math"
+#endif
+
+#define XOS_MS_TO_TICKS(ms) \
+    ((uint32_t)(((uint64_t)(ms) * (uint64_t)XOS_TICK_RATE_HZ) / 1000ULL))
+#define XOS_TICKS_TO_MS(ticks) \
+    ((uint32_t)(((uint64_t)(ticks) * 1000ULL) / (uint64_t)XOS_TICK_RATE_HZ))
+#endif
+
 typedef uint64_t xhal_tick_ms_t;  // Tick 类型，毫秒
 typedef uint32_t xhal_tick_sec_t; // Tick 类型，秒
 typedef time_t xhal_ts_t;         // 时间戳类型，绝对时间
