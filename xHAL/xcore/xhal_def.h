@@ -19,7 +19,8 @@
     ERR(XHAL_ERR_MALLOC, -10, "Malloc failed")      \
     ERR(XHAL_ERR_NOT_ENOUGH, -11, "Not enough")     \
     ERR(XHAL_ERR_NO_INIT, -12, "Not initialized")   \
-    ERR(XHAL_ERR_BUS, -13, "Bus error")
+    ERR(XHAL_ERR_BUS, -13, "Bus error")\
+    ERR(XHAL_ERR_NOT_SUPPORT, -14, "Not supported")
 
 typedef enum xhal_err
 {

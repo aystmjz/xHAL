@@ -51,16 +51,16 @@ static const osMutexAttr_t xlog_mutex_attr = {
 #endif
 
 #if (XLOG_COLOR_ENABLE != 0)
-static const char *const XLOG_color_table[XLOG_LEVEL_MAX] = {
+static const char *const xlog_color_table[XLOG_LEVEL_MAX] = {
     NONE, LIGHT_RED, YELLOW, LIGHT_BLUE, GREEN,
 };
 #endif
 
-static const char XLOG_level_lable[XLOG_LEVEL_MAX] = {
+static const char xlog_level_lable[XLOG_LEVEL_MAX] = {
     ' ', 'E', 'W', 'I', 'D',
 };
 
-static uint8_t XLOG_level = XLOG_DEFAULT_LEVEL;
+static uint8_t xlog_level = XLOG_DEFAULT_LEVEL;
 
 void xlog_default_output(const void *data, uint32_t size)
 {
@@ -74,10 +74,10 @@ void xlog_default_output(const void *data, uint32_t size)
 
 void xlog_set_level(uint8_t level)
 {
-    XLOG_level = level;
-    if (XLOG_level >= XLOG_LEVEL_MAX)
+    xlog_level = level;
+    if (xlog_level >= XLOG_LEVEL_MAX)
     {
-        XLOG_level = XLOG_LEVEL_MAX - 1;
+        xlog_level = XLOG_LEVEL_MAX - 1;
     }
 }
 
@@ -129,7 +129,7 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
 {
     if (fmt == NULL || name == NULL)
         return XHAL_ERR_INVALID;
-    if (XLOG_level < level)
+    if (xlog_level < level)
         return XHAL_OK;
 
     xhal_err_t ret = XHAL_OK;
@@ -163,21 +163,21 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
     (XLOG_TIME_MODE == XLOG_TIME_RELATIVE) || \
     (XLOG_TIME_MODE == XLOG_TIME_ABSOLUTE)
     count =
-        snprintf(buff, sizeof(buff), "%s[%c/%s %s] ", XLOG_color_table[level],
-                 XLOG_level_lable[level], name, str_buff);
+        snprintf(buff, sizeof(buff), "%s[%c/%s %s] ", xlog_color_table[level],
+                 xlog_level_lable[level], name, str_buff);
 #else
-    count = snprintf(buff, sizeof(buff), "%s[%c/%s] ", XLOG_color_table[level],
-                     XLOG_level_lable[level], name);
+    count = snprintf(buff, sizeof(buff), "%s[%c/%s] ", xlog_color_table[level],
+                     xlog_level_lable[level], name);
 #endif
 #else
 #if (XLOG_TIME_MODE == XLOG_TIME_MILLIS) ||   \
     (XLOG_TIME_MODE == XLOG_TIME_RELATIVE) || \
     (XLOG_TIME_MODE == XLOG_TIME_ABSOLUTE)
-    count = snprintf(buff, sizeof(buff), "[%c/%s %s] ", XLOG_level_lable[level],
+    count = snprintf(buff, sizeof(buff), "[%c/%s %s] ", xlog_level_lable[level],
                      name, str_buff);
 #else
     count =
-        snprintf(buff, sizeof(buff), "[%c/%s] ", XLOG_level_lable[level], name);
+        snprintf(buff, sizeof(buff), "[%c/%s] ", xlog_level_lable[level], name);
 #endif
 #endif /* XLOG_COLOR_ENABLE */
 

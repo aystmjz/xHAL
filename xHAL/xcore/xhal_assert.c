@@ -12,9 +12,9 @@ XLOG_TAG("xAssert");
 #if XASSERT_USER_HOOK_ENABLE != 0
 XHAL_WEAK void xassert_user_hook()
 {
-    /* user code start */
+    /* ----------- user code start --------------- */
     /* do nothing */
-    /* user code end */
+    /* -----------  user code end  --------------- */
 }
 #endif
 

@@ -20,7 +20,7 @@ XLOG_TAG("xExport");
 #define XEXPORT_DEFAULT_PRIORITY   (osPriorityNormal)
 
 #ifndef XEXPORT_THREAD_STACK_SIZE
-#define XEXPORT_THREAD_STACK_SIZE (2048)
+#define XEXPORT_THREAD_STACK_SIZE (1024)
 #endif
 
 static const osThreadAttr_t export_thread_attr = {
@@ -54,8 +54,9 @@ POLL_EXPORT(null_poll, (60 * 1000));
 
 static const xhal_export_t *export_init_table = NULL; /* 初始化导出表 */
 static const xhal_export_t *export_poll_table = NULL; /* 轮询导出表 */
-static uint32_t count_export_init = 0; /* 初始化导出函数计数 */
-static uint32_t count_export_poll = 0; /* 轮询导出函数计数 */
+
+static uint32_t export_init_count = 0; /* 初始化导出函数计数 */
+static uint32_t export_poll_count = 0; /* 轮询导出函数计数 */
 static int16_t export_level_max   = 0; /* 最大导出级别 */
 
 /**
@@ -138,9 +139,9 @@ static void _get_init_export_table(void)
             break; /* 如果不是有效的初始化导出项，则退出循环 */
         }
     }
-    count_export_init = i; /* 设置初始化导出函数计数 */
+    export_init_count = i; /* 设置初始化导出函数计数 */
 
-    XLOG_DEBUG("Export init table: %d", count_export_init);
+    XLOG_DEBUG("Export init table: %d", export_init_count);
     XLOG_DEBUG("Export init level max: %d", export_level_max);
 }
 
@@ -180,14 +181,14 @@ static void _get_poll_export_table(void)
             break; /* 如果不是有效的轮询导出项，则退出循环 */
         }
     }
-    count_export_poll = i; /* 设置轮询导出函数计数 */
+    export_poll_count = i; /* 设置轮询导出函数计数 */
 
-    XLOG_DEBUG("Export poll table: %d", count_export_poll);
+    XLOG_DEBUG("Export poll table: %d", export_poll_count);
 }
 
 static void _export_init_func(int16_t level)
 {
-    for (uint32_t i = 0; i < count_export_init; i++)
+    for (uint32_t i = 0; i < export_init_count; i++)
     {
         if (export_init_table[i].level == level)
         {
@@ -269,7 +270,7 @@ static void _poll_thread(void *arg)
 
 static void _export_poll_func(void)
 {
-    for (uint32_t i = 0; i < count_export_poll; i++)
+    for (uint32_t i = 0; i < export_poll_count; i++)
     {
         if ((xhal_pointer_t)&export_poll_table[i] ==
             (xhal_pointer_t)&poll_null_poll)
@@ -334,7 +335,7 @@ static void _export_poll_func(void)
 
     while (1)
     {
-        for (uint32_t i = 0; i < count_export_poll; i++)
+        for (uint32_t i = 0; i < export_poll_count; i++)
         {
             data = export_poll_table[i].data;
 

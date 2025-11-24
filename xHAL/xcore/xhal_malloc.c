@@ -6,16 +6,13 @@
 
 XLOG_TAG("xMalloc");
 
-/* 内部SRAM内存池 */
-static XHAL_USED XHAL_ALIGN(64) uint8_t mem1base[XMALLOC_MAX_SIZE];
-/* 内部SRAM内存池MAP */
-static uint16_t mem1mapbase[XMALLOC_ALLOC_TABLE_SIZE];
+static XHAL_USED XHAL_ALIGN(64) uint8_t xmem_internal_ram[XMALLOC_MAX_SIZE];
+static uint16_t xmem_internal_map[XMALLOC_ALLOC_TABLE_SIZE];
 
-/* 内存管理控制器 */
-struct _m_mallco_dev mallco_dev = {
-    mem1base,    /* 内存池 */
-    mem1mapbase, /* 内存管理状态表 */
-    0,           /* 内存管理未就绪 */
+static xmem_pool_t xmem_pool = {
+    .membase = xmem_internal_ram,
+    .memmap  = xmem_internal_map,
+    .memrdy  = 0,
 };
 
 /**
@@ -58,7 +55,7 @@ uint32_t xmem_free_size(void)
     XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
     for (uint32_t i = 0; i < XMALLOC_ALLOC_TABLE_SIZE; i++)
     {
-        if (mallco_dev.memmap[i] == 0)
+        if (xmem_pool.memmap[i] == 0)
             free_blocks++;
     }
     XMALLOC_EXIT_CRITICAL(); /* 离开临界区 */
@@ -95,12 +92,12 @@ static uint32_t my_mem_malloc(uint32_t size)
     uint32_t cmemb = 0; /* 连续空内存块数 */
     uint32_t i;
 
-    if (!mallco_dev.memrdy) /* 未初始化,先执行初始化 */
+    if (!xmem_pool.memrdy) /* 未初始化,先执行初始化 */
     {
         uint8_t mttsize = sizeof(uint16_t); /* 获取memmap数组的类型长度*/
-        xmemset(mallco_dev.memmap, 0,
+        xmemset(xmem_pool.memmap, 0,
                 XMALLOC_ALLOC_TABLE_SIZE * mttsize); /* 内存状态表数据清零 */
-        mallco_dev.memrdy = 1; /* 内存管理初始化OK */
+        xmem_pool.memrdy = 1; /* 内存管理初始化OK */
     }
 
     if (size == 0)
@@ -115,7 +112,7 @@ static uint32_t my_mem_malloc(uint32_t size)
     for (offset = XMALLOC_ALLOC_TABLE_SIZE - 1; offset >= 0;
          offset--) /* 搜索整个内存控制区 */
     {
-        if (!mallco_dev.memmap[offset])
+        if (!xmem_pool.memmap[offset])
             cmemb++; /* 连续空内存块数增加 */
         else
             cmemb = 0; /* 连续内存块清零 */
@@ -123,7 +120,7 @@ static uint32_t my_mem_malloc(uint32_t size)
         if (cmemb == nmemb) /* 标注内存块非空 */
         {
             for (i = 0; i < nmemb; i++)
-                mallco_dev.memmap[offset + i] = nmemb;
+                xmem_pool.memmap[offset + i] = nmemb;
             return (offset * XMALLOC_BLOCK_SIZE); /* 返回偏移地址 */
         }
     }
@@ -142,7 +139,7 @@ static uint32_t my_mem_malloc(uint32_t size)
  */
 static uint8_t my_mem_free(uint32_t offset)
 {
-    if (!mallco_dev.memrdy) /* 未初始化 */
+    if (!xmem_pool.memrdy) /* 未初始化 */
     {
         return 1;
     } /* 未初始化 */
@@ -150,10 +147,10 @@ static uint8_t my_mem_free(uint32_t offset)
     if (offset < XMALLOC_MAX_SIZE) /* 偏移在内存池内. */
     {
         int index = offset / XMALLOC_BLOCK_SIZE; /* 偏移所在内存块号码 */
-        int nmemb = mallco_dev.memmap[index];    /* 内存块数量 */
+        int nmemb = xmem_pool.memmap[index];    /* 内存块数量 */
 
         for (int i = 0; i < nmemb; i++) /* 内存块清零 */
-            mallco_dev.memmap[index + i] = 0;
+            xmem_pool.memmap[index + i] = 0;
 
         return 0;
     }
@@ -176,7 +173,7 @@ void xfree(void *ptr)
         return; /* 地址为0. */
     }
 
-    uint32_t offset = (uint32_t)ptr - (uint32_t)mallco_dev.membase;
+    uint32_t offset = (uint32_t)ptr - (uint32_t)xmem_pool.membase;
 
     XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
     my_mem_free(offset);      /* 释放内存 */
@@ -214,7 +211,7 @@ void *xmalloc(uint32_t size)
     else
     {
         /* 申请没问题, 返回首地址 */
-        ptr = (void *)((uint32_t)mallco_dev.membase + offset);
+        ptr = (void *)((uint32_t)xmem_pool.membase + offset);
 
 #ifdef XDEBUG
         uint16_t perused = xmem_perused();
@@ -266,7 +263,7 @@ void *xrealloc(void *ptr, uint32_t size)
     if (offset == 0xFFFFFFFF)
         return NULL; /* 返回空(0) */
 
-    void *new_ptr = (void *)((uint32_t)mallco_dev.membase + offset);
+    void *new_ptr = (void *)((uint32_t)xmem_pool.membase + offset);
 
     xmemcpy(new_ptr, ptr, size); /* 拷贝旧内存内容到新内存 */
     xfree(ptr);                  /* 释放旧内存 */
