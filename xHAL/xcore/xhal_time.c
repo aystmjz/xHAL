@@ -1,6 +1,5 @@
 #include "xhal_time.h"
 #include "xhal_assert.h"
-#include "xhal_export.h"
 #include "xhal_log.h"
 #include <stdio.h>
 
@@ -49,27 +48,10 @@ static const osMutexAttr_t xtime_mutex_attr = {
 };
 #endif
 
-static xhal_ts_t _default_rtc_get_ts(void);
+static volatile xhal_tick_ms_t xtime_sys_base_ms = 0; /* 系统基准毫秒计数器 */
 
-static volatile xhal_tick_ms_t sys_base_ms = 0; /* 系统基准毫秒计数器 */
-
-static xhal_ts_t startup_ts = XTIME_INVALID_TS; /* 系统启动时的时间戳 */
-static xhal_ts_t base_ts = XTIME_INVALID_TS;    /* 基准时间戳 */
-
-/* 函数指针变量，初始指向默认函数 */
-static rtc_get_ts_func_t _rtc_get_ts_func = _default_rtc_get_ts;
-
-/**
- * @brief  设置RTC获取时间戳函数
- * @param  func RTC时间戳获取函数指针
- */
-void xtime_set_rtc_get_ts_func(rtc_get_ts_func_t func)
-{
-    if (func != NULL)
-        _rtc_get_ts_func = func;
-    else
-        _rtc_get_ts_func = _default_rtc_get_ts;
-}
+static xhal_ts_t xtime_startup_ts = XTIME_INVALID_TS; /* 系统启动时的时间戳 */
+static xhal_ts_t xtime_base_ts = XTIME_INVALID_TS; /* 基准时间戳 */
 
 xhal_tick_ms_t xtime_get_tick_ms(void)
 {
@@ -81,13 +63,14 @@ xhal_tick_ms_t xtime_get_tick_ms(void)
 #endif
     xhal_tick_ms_t ret;
 
-    if (startup_ts == XTIME_INVALID_TS)
+    if (xtime_startup_ts == XTIME_INVALID_TS)
     {
-        ret = sys_base_ms;
+        ret = xtime_sys_base_ms;
     }
     else
     {
-        ret = ((xhal_tick_ms_t)(base_ts - startup_ts) * 1000ULL) + sys_base_ms;
+        ret = ((xhal_tick_ms_t)(xtime_base_ts - xtime_startup_ts) * 1000ULL) +
+              xtime_sys_base_ms;
     }
 
 #ifdef XHAL_OS_SUPPORTING
@@ -106,15 +89,16 @@ xhal_tick_sec_t xtime_get_tick_sec(void)
     xassert(ret_os == osOK);
 #endif
     xhal_tick_sec_t ret;
-    xhal_tick_sec_t sys_base_sec = (xhal_tick_sec_t)(sys_base_ms / 1000);
+    xhal_tick_sec_t sys_base_sec = (xhal_tick_sec_t)(xtime_sys_base_ms / 1000);
 
-    if (startup_ts == XTIME_INVALID_TS)
+    if (xtime_startup_ts == XTIME_INVALID_TS)
     {
         ret = sys_base_sec;
     }
     else
     {
-        ret = (xhal_tick_sec_t)(base_ts - startup_ts) + sys_base_sec;
+        ret =
+            (xhal_tick_sec_t)(xtime_base_ts - xtime_startup_ts) + sys_base_sec;
     }
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(mutex);
@@ -188,8 +172,9 @@ xhal_err_t xtime_get_format_uptime(char *time_str, uint8_t buff_len)
     uint32_t seconds              = total_seconds % 60;
 
     /* 格式化时间字符串，包含小时、分钟、秒和毫秒 */
-    uint32_t count = snprintf(time_str, buff_len, "%01u:%02u:%02u.%03u", hours,
-                              minutes, seconds, (uint32_t)(sys_base_ms % 1000));
+    uint32_t count =
+        snprintf(time_str, buff_len, "%01u:%02u:%02u.%03u", hours, minutes,
+                 seconds, (uint32_t)(xtime_sys_base_ms % 1000));
 
     if (count >= buff_len)
     {
@@ -213,13 +198,13 @@ xhal_ts_t xtime_get_ts(void)
 #endif
     xhal_ts_t ret;
 
-    if (base_ts == XTIME_INVALID_TS)
+    if (xtime_base_ts == XTIME_INVALID_TS)
     {
         ret = XTIME_INVALID_TS; // 未设置基准时间
     }
     else
     {
-        ret = base_ts + (xhal_ts_t)(sys_base_ms / 1000);
+        ret = xtime_base_ts + (xhal_ts_t)(xtime_sys_base_ms / 1000);
     }
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(mutex);
@@ -263,28 +248,15 @@ xhal_err_t xtime_get_format_time(char *time_str, uint8_t buff_len)
 }
 
 /**
- * @brief  从RTC同步时间
+ * @brief  同步时间
  * @retval 错误码
  */
-xhal_err_t xtime_sync_time_from_rtc(void)
+xhal_err_t xtime_sync_time(xhal_ts_t ts)
 {
-    xhal_ts_t rtc_ts = _rtc_get_ts_func();
-
-    /* 检查RTC时间戳是否有效 */
-    if (rtc_ts == XTIME_INVALID_TS)
-    {
-#ifdef XDEBUG
-        XLOG_ERROR("XHAL_ERR_NO_INIT");
-#endif
-        return XHAL_ERR_NO_INIT;
-    }
-
     /* 检查RTC时间是否有效 */
-    if (base_ts != XTIME_INVALID_TS && (rtc_ts + XTIME_ALLOWED_DRIFT) < base_ts)
+    if (xtime_base_ts != XTIME_INVALID_TS &&
+        (ts + XTIME_ALLOWED_DRIFT) < xtime_base_ts)
     {
-#ifdef XDEBUG
-        XLOG_ERROR("XHAL_ERR_INVALID");
-#endif
         return XHAL_ERR_INVALID;
     }
 #ifdef XHAL_OS_SUPPORTING
@@ -294,18 +266,19 @@ xhal_err_t xtime_sync_time_from_rtc(void)
     xassert(ret_os == osOK);
 #endif
     /* 首次同步时间 */
-    if (startup_ts == XTIME_INVALID_TS)
+    if (xtime_startup_ts == XTIME_INVALID_TS)
     {
-        startup_ts = rtc_ts - (sys_base_ms / 1000);
-        base_ts    = startup_ts;
-        XLOG_INFO("RTC time first sync completed, base timestamp: %u", base_ts);
+        xtime_startup_ts = ts - (xtime_sys_base_ms / 1000);
+        xtime_base_ts    = xtime_startup_ts;
+        XLOG_INFO("RTC time first sync completed, base timestamp: %u",
+                  xtime_base_ts);
     }
     else
     {
         /* 重新同步时间 */
-        sys_base_ms = 0;
-        base_ts     = rtc_ts;
-        XLOG_INFO("RTC time resync completed, timestamp: %u", rtc_ts);
+        xtime_sys_base_ms = 0;
+        xtime_base_ts     = ts;
+        XLOG_INFO("RTC time resync completed, timestamp: %u", ts);
     }
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(mutex);
@@ -313,31 +286,13 @@ xhal_err_t xtime_sync_time_from_rtc(void)
 #endif
     return XHAL_OK;
 }
-/* 根据配置决定是否启用自动时间同步 */
-#if XTIME_AUTO_SYNC_ENABLE != 0
-#ifdef XHAL_OS_SUPPORTING
-POLL_EXPORT_OS(xtime_sync_time_from_rtc, XTIME_AUTO_SYNC_TIME, osPriorityHigh,
-               512);
-#else
-POLL_EXPORT(xtime_sync_time_from_rtc, XTIME_AUTO_SYNC_TIME);
-#endif
-#endif
 
 /**
  * @brief  SysTick毫秒中断处理函数
  */
 void xtime_ms_tick_handler(void)
 {
-    sys_base_ms++;
-}
-
-/**
- * @brief  默认RTC获取时间戳函数
- * @retval 无效时间戳
- */
-static xhal_ts_t _default_rtc_get_ts(void)
-{
-    return XTIME_INVALID_TS;
+    xtime_sys_base_ms++;
 }
 
 #ifdef XHAL_OS_SUPPORTING

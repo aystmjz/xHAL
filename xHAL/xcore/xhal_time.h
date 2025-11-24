@@ -34,12 +34,10 @@ void xtime_delay_us(uint32_t delay_us);
 void xtime_delay_ms(uint32_t delay_ms);
 void xtime_delay_s(uint32_t delay_s);
 
-void xtime_set_rtc_get_ts_func(rtc_get_ts_func_t func);
-
 xhal_ts_t xtime_get_ts(void);
 xhal_err_t xtime_get_format_uptime(char *time_str, uint8_t str_len);
 xhal_err_t xtime_get_format_time(char *time_str, uint8_t str_len);
-xhal_err_t xtime_sync_time_from_rtc(void);
+xhal_err_t xtime_sync_time(xhal_ts_t ts);
 
 void xtime_ms_tick_handler(void);
 
