@@ -1,11 +1,13 @@
 #include "../../xcore/xhal_common.h"
 #include "../../xcore/xhal_malloc.h"
 #include "../xhal_shell.h"
+#include "cmd_config.h"
 #include <stdlib.h>
 #include <string.h>
 
 #define CMD_MEMINFO_DESCRIPTION "mem\r\n"
 
+#if SHELL_CMD_IS_ENABLED(MEM)
 static int meminfo_cmd(int argc, char *argv[])
 {
     Shell *shell = shellGetCurrent();
@@ -42,3 +44,4 @@ static int meminfo_cmd(int argc, char *argv[])
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
                  mem, meminfo_cmd,
                  "\r\nshow memory usage\r\n" CMD_MEMINFO_DESCRIPTION);
+#endif

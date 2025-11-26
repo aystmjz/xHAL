@@ -1,6 +1,7 @@
 #include "../../xcore/xhal_common.h"
 #include "../../xlib/xhal_bit.h"
 #include "../xhal_shell.h"
+#include "cmd_config.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,6 +33,8 @@
 /* 表头字节数，可能会多几个字节 */
 #define XLOG_DUMP_TABLE_HEADER_BYTES              (332)
 
+
+#if SHELL_CMD_IS_ENABLED(DUMP)
 xhal_err_t dump_memory(Shell *shell, void *addr, xhal_size_t size,
                        uint8_t flags_mask)
 {
@@ -254,5 +257,7 @@ static int dump_cmd(int argc, char *argv[])
     }
     return 0;
 }
+
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
                  dump, dump_cmd, "\r\ndump memory\r\n" CMD_DUMP_CDISCRIPTION);
+#endif
