@@ -43,5 +43,5 @@ static int meminfo_cmd(int argc, char *argv[])
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
                  mem, meminfo_cmd,
-                 "\r\nshow memory usage\r\n" CMD_MEMINFO_DESCRIPTION);
+                 "\r\nshow memory\r\n" CMD_MEMINFO_DESCRIPTION);
 #endif
