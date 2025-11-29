@@ -45,7 +45,8 @@
 
 typedef void (*xlog_output_t)(const void *data, uint32_t size);
 
-void xlog_set_level(uint8_t level);
+uint8_t xlog_get_level(void);
+xhal_err_t xlog_set_level(uint8_t level);
 
 xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...);
 xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,

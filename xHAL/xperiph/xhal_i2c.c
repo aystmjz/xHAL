@@ -25,12 +25,18 @@ xhal_err_t xi2c_inst(xhal_i2c_t *self, const char *name,
     xassert_not_null(config);
     xassert_ptr_struct_not_null(ops, name);
 
+    xhal_err_t ret                   = XHAL_OK;
     xhal_i2c_t *i2c                  = self;
     xhal_periph_attr_t periph_config = {
         .name = name,
         .type = XHAL_PERIPH_I2C,
     };
-    xperiph_register(&i2c->peri, &periph_config);
+
+    ret = xperiph_register(&i2c->peri, &periph_config);
+    if (ret != XHAL_OK)
+    {
+        return ret;
+    }
 
     i2c->ops         = ops;
     i2c->data.config = *config;
@@ -43,7 +49,7 @@ xhal_err_t xi2c_inst(xhal_i2c_t *self, const char *name,
     i2c->data.event_flag = osEventFlagsNew(&xi2c_event_flag_attr);
     xassert_not_null(i2c->data.event_flag);
 #endif
-    xhal_err_t ret = i2c->ops->init(i2c);
+    ret = i2c->ops->init(i2c);
     if (ret != XHAL_OK)
     {
         xperiph_unregister(&i2c->peri);

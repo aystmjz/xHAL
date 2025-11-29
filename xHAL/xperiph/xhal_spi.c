@@ -41,12 +41,18 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
     xassert_name(IS_XSPI_DIRECTION(config->direction), name);
     xassert_name(IS_XSPI_DATA_BITS(config->data_bits), name);
 
+    xhal_err_t ret                   = XHAL_OK;
     xhal_spi_t *spi                  = self;
     xhal_periph_attr_t periph_config = {
         .name = name,
         .type = XHAL_PERIPH_SPI,
     };
-    xperiph_register(&spi->peri, &periph_config);
+
+    ret = xperiph_register(&spi->peri, &periph_config);
+    if (ret != XHAL_OK)
+    {
+        return ret;
+    }
 
     spi->ops            = ops;
     spi->data.config    = *config;
@@ -59,7 +65,7 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
     spi->data.event_flag = osEventFlagsNew(&xspi_event_flag_attr);
     xassert_not_null(spi->data.event_flag);
 #endif
-    xhal_err_t ret = spi->ops->init(spi);
+    ret = spi->ops->init(spi);
     if (ret != XHAL_OK)
     {
         xperiph_unregister(&spi->peri);

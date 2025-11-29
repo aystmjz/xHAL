@@ -72,13 +72,21 @@ void xlog_default_output(const void *data, uint32_t size)
     }
 }
 
-void xlog_set_level(uint8_t level)
+uint8_t xlog_get_level(void)
 {
-    xlog_level = level;
+    return xlog_level;
+}
+
+xhal_err_t xlog_set_level(uint8_t level)
+{
+
     if (xlog_level >= XLOG_LEVEL_MAX)
     {
-        xlog_level = XLOG_LEVEL_MAX - 1;
+        return XHAL_ERR_INVALID;
     }
+    xlog_level = level;
+
+    return XHAL_OK;
 }
 
 xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...)

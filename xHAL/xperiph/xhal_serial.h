@@ -51,9 +51,9 @@ typedef struct xhal_serial_config
 
 typedef struct
 {
-    uint32_t rx_full; /* 已接收但未读取的字节数 */
+    uint32_t rx_used; /* 已接收但未读取的字节数 */
     uint32_t rx_free; /* 接收缓冲剩余空间 */
-    uint32_t tx_full; /* 发送缓冲中未发送的字节数 */
+    uint32_t tx_used; /* 发送缓冲中未发送的字节数 */
     uint32_t tx_free; /* 发送缓冲剩余空间 */
 } xserial_status_t;
 

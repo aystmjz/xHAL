@@ -47,12 +47,18 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
     xassert_name(IS_XSERIAL_STOP_BITS(config->stop_bits), name);
     xassert_name(IS_XSERIAL_PARITY(config->parity), name);
 
+    xhal_err_t ret                   = XHAL_OK;
     xhal_serial_t *serial            = self;
     xhal_periph_attr_t periph_config = {
         .name = name,
         .type = XHAL_PERIPH_UART,
     };
-    xperiph_register(&serial->peri, &periph_config);
+
+    ret = xperiph_register(&serial->peri, &periph_config);
+    if (ret != XHAL_OK)
+    {
+        return ret;
+    }
 
     serial->ops         = ops;
     serial->data.config = *config;
@@ -70,7 +76,7 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
     serial->data.event_flag = osEventFlagsNew(&xserial_event_flag_attr);
     xassert_not_null(serial->data.event_flag);
 #endif
-    xhal_err_t ret = serial->ops->init(serial);
+    ret = serial->ops->init(serial);
     if (ret != XHAL_OK)
     {
         xperiph_unregister(&serial->peri);
@@ -268,6 +274,7 @@ xhal_err_t xserial_clear(xhal_periph_t *self)
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 
+    xhal_err_t ret        = XHAL_OK;
     xhal_serial_t *serial = XSERIAL_CAST(self);
 
 #ifdef XHAL_OS_SUPPORTING
@@ -277,13 +284,15 @@ xhal_err_t xserial_clear(xhal_periph_t *self)
 #endif
     uint32_t full = xrbuf_get_full(&serial->data.rx_rbuf);
     uint32_t len  = xrbuf_skip(&serial->data.rx_rbuf, full);
-    xassert_name(len == full, self->attr.name);
-
+    if (len != full)
+    {
+        ret = XHAL_ERROR;
+    }
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
-    return XHAL_OK;
+    return ret;
 }
 
 uint32_t xserial_printf(xhal_periph_t *self, const char *fmt, ...)
@@ -422,7 +431,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
-    status->rx_full = xrbuf_get_full(&serial->data.rx_rbuf);
+    status->rx_used = xrbuf_get_full(&serial->data.rx_rbuf);
     status->rx_free = xrbuf_get_free(&serial->data.rx_rbuf);
 
 #ifdef XHAL_OS_SUPPORTING
@@ -431,7 +440,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
     ret_os = osMutexAcquire(serial->data.tx_mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
-    status->tx_full = xrbuf_get_full(&serial->data.tx_rbuf);
+    status->tx_used = xrbuf_get_full(&serial->data.tx_rbuf);
     status->tx_free = xrbuf_get_free(&serial->data.tx_rbuf);
 
 #ifdef XHAL_OS_SUPPORTING
@@ -492,6 +501,10 @@ xhal_err_t xserial_set_baudrate(xhal_periph_t *self, uint32_t baudrate)
     xperiph_lock(self);
     xhal_serial_config_t config = serial->data.config;
     xperiph_unlock(self);
+    if (baudrate == config.baud_rate)
+    {
+        return XHAL_OK;
+    }
     config.baud_rate = baudrate;
 
     return xserial_set_config(self, &config);

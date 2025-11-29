@@ -12,6 +12,10 @@ XLOG_TAG("xTime");
 #define XTIME_USE_DWT_DELAY (0)
 #endif
 
+#if XTIME_USE_DWT_DELAY == 0
+#include XHAL_CMSIS_DEVICE_HEADER
+#endif
+
 #if XTIME_USE_DWT_DELAY != 0
 #include XHAL_CMSIS_DEVICE_HEADER
 

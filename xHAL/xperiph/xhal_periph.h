@@ -13,15 +13,12 @@ enum xhal_periph_type
     XHAL_PERIPH_NULL = 0,
 
     XHAL_PERIPH_PIN,
-    XHAL_PERIPH_PWM,
     XHAL_PERIPH_ADC,
-    XHAL_PERIPH_DAC,
     XHAL_PERIPH_UART,
     XHAL_PERIPH_I2C,
     XHAL_PERIPH_SPI,
     XHAL_PERIPH_TIM,
-    XHAL_PERIPH_WATCHDOG,
-    XHAL_PERIPH_RTC,
+    XHAL_PERIPH_EXIT,
     XHAL_PERIPH_UNKNOWN,
 
     XHAL_PERIPH_NORMAL_MAX,
@@ -59,8 +56,8 @@ typedef struct xhal_periph
 #define XPERIPH_CHECK_TYPE(_peri, _type) \
     xassert_name(_peri->attr.type == _type, _peri->attr.name)
 
-void xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr);
-void xperiph_unregister(xhal_periph_t *self);
+xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr);
+xhal_err_t xperiph_unregister(xhal_periph_t *self);
 uint16_t xperiph_get_number(void);
 xhal_periph_t *xperiph_find(const char *name);
 uint8_t xperiph_valid(const char *name);

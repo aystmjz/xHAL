@@ -39,6 +39,7 @@ typedef struct xhal_exit_data
 {
     xhal_exit_config_t config;
     xhal_exit_cb_t irq_callback;
+    
     const char *name;
 } xhal_exit_data_t;
 

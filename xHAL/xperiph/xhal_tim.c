@@ -96,20 +96,25 @@ xhal_err_t xtim_inst(xhal_tim_t *self, const char *name,
         break;
     }
 
-    xhal_tim_t *tim = self;
-
+    xhal_err_t ret                 = XHAL_OK;
+    xhal_tim_t *tim                = self;
     xhal_periph_attr_t periph_attr = {
         .name = name,
         .type = XHAL_PERIPH_TIM,
     };
-    xperiph_register(&tim->peri, &periph_attr);
+
+    ret = xperiph_register(&tim->peri, &periph_attr);
+    if (ret != XHAL_OK)
+    {
+        return ret;
+    }
 
     tim->ops               = ops;
     tim->data.config       = *config;
     tim->data.irq_callback = NULL;
     tim->data.name         = tim_name;
 
-    xhal_err_t ret = tim->ops->init(tim);
+    ret = tim->ops->init(tim);
     if (ret != XHAL_OK)
     {
         xperiph_unregister(&tim->peri);

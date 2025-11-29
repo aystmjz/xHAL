@@ -38,12 +38,18 @@ xhal_err_t xadc_inst(xhal_adc_t *self, const char *name,
     xassert_name(channel_mask != 0, name);
     xassert_name(config->reference_voltage > 0, name);
 
+    xhal_err_t ret                   = XHAL_OK;
     xhal_adc_t *adc                  = self;
     xhal_periph_attr_t periph_config = {
         .name = name,
         .type = XHAL_PERIPH_ADC,
     };
-    xperiph_register(&adc->peri, &periph_config);
+
+    ret = xperiph_register(&adc->peri, &periph_config);
+    if (ret != XHAL_OK)
+    {
+        return ret;
+    }
 
     adc->ops               = ops;
     adc->data.channel_mask = channel_mask;
@@ -57,7 +63,7 @@ xhal_err_t xadc_inst(xhal_adc_t *self, const char *name,
     xassert_not_null(adc->data.event_flag);
 #endif
 
-    xhal_err_t ret = adc->ops->init(adc);
+    ret = adc->ops->init(adc);
     if (ret != XHAL_OK)
     {
         xperiph_unregister(&adc->peri);

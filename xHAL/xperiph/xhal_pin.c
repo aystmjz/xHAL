@@ -22,20 +22,25 @@ xhal_err_t xpin_inst(xhal_pin_t *self, const char *name,
     xassert_name(IS_XPIN_MODE(mode), name);
     xassert_name(IS_XPIN_STATE(status), name);
 
-    xhal_pin_t *pin = self;
-
+    xhal_err_t ret                 = XHAL_OK;
+    xhal_pin_t *pin                = self;
     xhal_periph_attr_t periph_attr = {
         .name = name,
         .type = XHAL_PERIPH_PIN,
     };
-    xperiph_register(&pin->peri, &periph_attr);
+
+    ret = xperiph_register(&pin->peri, &periph_attr);
+    if (ret != XHAL_OK)
+    {
+        return ret;
+    }
 
     pin->ops         = ops;
     pin->data.name   = pin_name;
     pin->data.mode   = mode;
     pin->data.status = status;
 
-    xhal_err_t ret = pin->ops->init(pin, status);
+    ret = pin->ops->init(pin, status);
     if (ret != XHAL_OK)
     {
         xperiph_unregister(&pin->peri);
