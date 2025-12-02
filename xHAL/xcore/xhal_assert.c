@@ -31,31 +31,35 @@ void _xassert_func(void)
     }
 }
 
-void _xassert(const char *str, uint32_t id, const char *tag, const char *file,
-              const char *func, uint32_t line)
+void _xassert(const char *condition, const char *extra, const char *tag,
+              const char *file, const char *func, uint32_t line, uint32_t id)
 {
-    if (str == NULL || tag == NULL || file == NULL)
+    if (condition == NULL || tag == NULL || file == NULL)
         return;
 
     if (id == XASSERT_INVALID_ID)
         XLOG_ERROR("\r\n\r\n==============================\r\n"
                    " Assert failure!\r\n"
+                   " Condition| %s\r\n"
                    " Module   | %s\r\n"
                    " Location | %s:%d\r\n"
                    " Function | %s\r\n"
                    " Info     | %s\r\n"
                    "==============================",
-                   tag, file, line, func, str);
+                   condition, tag, file, line, func,
+                   extra == NULL ? "<none>" : extra);
     else
         XLOG_ERROR("\r\n\r\n==============================\r\n"
                    " Assert failure!\r\n"
+                   " Condition| %s\r\n"
                    " Module   | %s\r\n"
                    " Location | %s:%d\r\n"
                    " Function | %s\r\n"
-                   " Info     | %s\r\n"
                    " ID       | %d\r\n"
+                   " Info     | %s\r\n"
                    "==============================",
-                   tag, file, line, func, str, id);
+                   condition, tag, file, line, func, id,
+                   extra == NULL ? "<none>" : extra);
 
     xtime_delay_ms(20); /* 确保串口输出完毕 */
 

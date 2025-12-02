@@ -42,8 +42,8 @@
 #endif
 
 void _xassert_func(void);
-void _xassert(const char *str, uint32_t id, const char *tag, const char *file,
-              const char *func, uint32_t line);
+void _xassert(const char *condition, const char *extra, const char *tag,
+              const char *file, const char *func, uint32_t line, uint32_t id);
 
 #if XASSERT_ENABLE != 0
 
@@ -52,30 +52,30 @@ void _xassert(const char *str, uint32_t id, const char *tag, const char *file,
  * @brief  断言函数
  * @param  test   给定的条件
  */
-#define xassert(test)                                              \
-    do                                                             \
-    {                                                              \
-        if (!(test))                                               \
-        {                                                          \
-            xhal_pointer_t sp = XASSERT_GET_SP();                  \
-            _xassert(#test, XASSERT_INVALID_ID, TAG, XASSERT_FILE, \
-                     XASSERT_FUNC, XHAL_LINE);                     \
-            XASSERT_BACKTRACE(sp);                                 \
-            _xassert_func();                                       \
-        }                                                          \
+#define xassert(test)                                                         \
+    do                                                                        \
+    {                                                                         \
+        if (!(test))                                                          \
+        {                                                                     \
+            xhal_pointer_t sp = XASSERT_GET_SP();                             \
+            _xassert(#test, NULL, TAG, XASSERT_FILE, XASSERT_FUNC, XHAL_LINE, \
+                     XASSERT_INVALID_ID);                                     \
+            XASSERT_BACKTRACE(sp);                                            \
+            _xassert_func();                                                  \
+        }                                                                     \
     } while (0)
 
-#define xassert_tag(test, tag)                                     \
-    do                                                             \
-    {                                                              \
-        if (!(test))                                               \
-        {                                                          \
-            xhal_pointer_t sp = XASSERT_GET_SP();                  \
-            _xassert(#test, XASSERT_INVALID_ID, tag, XASSERT_FILE, \
-                     XASSERT_FUNC, XHAL_LINE);                     \
-            XASSERT_BACKTRACE(sp);                                 \
-            _xassert_func();                                       \
-        }                                                          \
+#define xassert_tag(test, tag)                                                \
+    do                                                                        \
+    {                                                                         \
+        if (!(test))                                                          \
+        {                                                                     \
+            xhal_pointer_t sp = XASSERT_GET_SP();                             \
+            _xassert(#test, NULL, tag, XASSERT_FILE, XASSERT_FUNC, XHAL_LINE, \
+                     XASSERT_INVALID_ID);                                     \
+            XASSERT_BACKTRACE(sp);                                            \
+            _xassert_func();                                                  \
+        }                                                                     \
     } while (0)
 
 /**
@@ -83,17 +83,17 @@ void _xassert(const char *str, uint32_t id, const char *tag, const char *file,
  * @param  test   给定的条件
  * @param  name   给定的名称
  */
-#define xassert_name(test, name)                                  \
-    do                                                            \
-    {                                                             \
-        if (!(test))                                              \
-        {                                                         \
-            xhal_pointer_t sp = XASSERT_GET_SP();                 \
-            _xassert(name, XASSERT_INVALID_ID, TAG, XASSERT_FILE, \
-                     XASSERT_FUNC, XHAL_LINE);                    \
-            XASSERT_BACKTRACE(sp);                                \
-            _xassert_func();                                      \
-        }                                                         \
+#define xassert_name(test, name)                                              \
+    do                                                                        \
+    {                                                                         \
+        if (!(test))                                                          \
+        {                                                                     \
+            xhal_pointer_t sp = XASSERT_GET_SP();                             \
+            _xassert(#test, name, TAG, XASSERT_FILE, XASSERT_FUNC, XHAL_LINE, \
+                     XASSERT_INVALID_ID);                                     \
+            XASSERT_BACKTRACE(sp);                                            \
+            _xassert_func();                                                  \
+        }                                                                     \
     } while (0)
 
 /**
@@ -101,17 +101,17 @@ void _xassert(const char *str, uint32_t id, const char *tag, const char *file,
  * @param  test   给定的条件
  * @param  id     给定的ID
  */
-#define xassert_id(test, id)                                               \
-    do                                                                     \
-    {                                                                      \
-        if (!(test))                                                       \
-        {                                                                  \
-            xhal_pointer_t sp = XASSERT_GET_SP();                          \
-            _xassert(#test, (uint32_t)id, TAG, XASSERT_FILE, XASSERT_FUNC, \
-                     XHAL_LINE);                                           \
-            XASSERT_BACKTRACE(sp);                                         \
-            _xassert_func();                                               \
-        }                                                                  \
+#define xassert_id(test, id)                                                  \
+    do                                                                        \
+    {                                                                         \
+        if (!(test))                                                          \
+        {                                                                     \
+            xhal_pointer_t sp = XASSERT_GET_SP();                             \
+            _xassert(#test, NULL, TAG, XASSERT_FILE, XASSERT_FUNC, XHAL_LINE, \
+                     (uint32_t)id);                                           \
+            XASSERT_BACKTRACE(sp);                                            \
+            _xassert_func();                                                  \
+        }                                                                     \
     } while (0)
 
 /**
