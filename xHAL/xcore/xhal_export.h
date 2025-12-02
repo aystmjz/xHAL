@@ -7,7 +7,8 @@
 #include "xhal_std.h"
 
 #define EXPORT_ID_INIT (0xabababab)
-#define EXPORT_ID_POLL (0xcdcdcdcd)
+#define EXPORT_ID_EXIT (0xcdcdcdcd)
+#define EXPORT_ID_POLL (0xefefefef)
 
 typedef enum xport_level
 {
@@ -40,7 +41,6 @@ typedef struct xhal_export
     void *func;          /* 导出函数 */
     void *data;          /* 导出函数数据 */
     uint8_t type;        /* 导出类型（保留字段） */
-    uint8_t exit;        /* 退出标志 */
     int16_t level;       /* 导出级别 */
     uint32_t period_ms;  /* 轮询周期 */
 #ifdef XHAL_OS_SUPPORTING
@@ -51,6 +51,7 @@ typedef struct xhal_export
 } xhal_export_t;
 
 void xhal_run(void);
+void xhal_exit(void);
 
 /*
  * @brief  初始化函数导出宏
@@ -64,27 +65,25 @@ void xhal_run(void);
         .name       = #_func,                                \
         .func       = (void *)&_func,                        \
         .level      = (int16_t)(_level),                     \
-        .exit       = false,                                 \
         .magic_head = EXPORT_ID_INIT,                        \
         .magic_tail = EXPORT_ID_INIT,                        \
     }
 
-// /*
-//  * @brief  退出函数导出宏
-//  * @param  _func   轮询函数
-//  * @param  _level  导出级别，范围[0, 127]
-//  * @retval 无
-//  */
-// #define EXIT_EXPORT(_func, _level)                           \
-//     XHAL_USED const xhal_export_t exit_##_func XHAL_SECTION( \
-//         ".xhal_init_export") = {                             \
-//         .name       = #_func,                                \
-//         .func       = (void *)&_func,                        \
-//         .level      = (int16_t)(_level),                     \
-//         .exit       = true,                                  \
-//         .magic_head = EXPORT_ID_INIT,                        \
-//         .magic_tail = EXPORT_ID_INIT,                        \
-//     }
+/*
+ * @brief  退出函数导出宏
+ * @param  _func   轮询函数
+ * @param  _level  导出级别，范围[0, 127]
+ * @retval 无
+ */
+#define EXIT_EXPORT(_func, _level)                           \
+    XHAL_USED const xhal_export_t exit_##_func XHAL_SECTION( \
+        ".xhal_exit_export") = {                             \
+        .name       = #_func,                                \
+        .func       = (void *)&_func,                        \
+        .level      = (int16_t)(_level),                     \
+        .magic_head = EXPORT_ID_EXIT,                        \
+        .magic_tail = EXPORT_ID_EXIT,                        \
+    }
 
 /*
  * @brief  单元测试函数导出宏
