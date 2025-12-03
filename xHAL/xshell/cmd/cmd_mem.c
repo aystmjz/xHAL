@@ -1,4 +1,3 @@
-#include "../../xcore/xhal_common.h"
 #include "../../xcore/xhal_malloc.h"
 #include "../xhal_shell.h"
 #include "cmd_config.h"
