@@ -4,12 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#define XLOG_BUFF_SIZE     (256) /* 日志缓冲区大小 */
-#define XLOG_DEFAULT_LEVEL (XLOG_LEVEL_DEBUG)
+#define XLOG_BUFF_SIZE (256) /* 日志缓冲区大小 */
 
-#define XLOG_TIME_MILLIS   (1)
-#define XLOG_TIME_RELATIVE (2)
-#define XLOG_TIME_ABSOLUTE (3)
+#ifndef XLOG_DEFAULT_LEVEL
+#define XLOG_DEFAULT_LEVEL (XLOG_LEVEL_DEBUG)
+#endif
+
+#ifndef XLOG_DEFAULT_TIME_MODE
+#define XLOG_DEFAULT_TIME_MODE (XLOG_TIME_MOD_RELATIVE)
+#endif
 
 #ifndef XLOG_COLOR_ENABLE
 #define XLOG_COLOR_ENABLE (1) /* 日志颜色显示 */
@@ -17,14 +20,6 @@
 
 #ifndef XLOG_NEWLINE_ENABLE
 #define XLOG_NEWLINE_ENABLE (1) /* 日志换行 */
-#endif
-
-#ifndef XLOG_TIME_ENABLE
-#define XLOG_TIME_ENABLE (1)
-#endif
-
-#ifndef XLOG_TIME_MODE
-#define XLOG_TIME_MODE (XLOG_TIME_ABSOLUTE)
 #endif
 
 /* 终端颜色控制序列 */
@@ -39,7 +34,7 @@
 
 static osMutexId_t _xlog_mutex(void);
 
-static char buff[XLOG_BUFF_SIZE];
+static char xlog_buff[XLOG_BUFF_SIZE];
 
 static osMutexId_t xlog_mutex              = NULL;
 static const osMutexAttr_t xlog_mutex_attr = {
@@ -60,7 +55,8 @@ static const char xlog_level_lable[XLOG_LEVEL_MAX] = {
     ' ', 'E', 'W', 'I', 'D',
 };
 
-static uint8_t xlog_level = XLOG_DEFAULT_LEVEL;
+static uint8_t xlog_level    = XLOG_DEFAULT_LEVEL;
+static uint8_t xlog_time_mod = XLOG_DEFAULT_TIME_MODE;
 
 void xlog_default_output(const void *data, uint32_t size)
 {
@@ -80,11 +76,28 @@ uint8_t xlog_get_level(void)
 xhal_err_t xlog_set_level(uint8_t level)
 {
 
-    if (xlog_level >= XLOG_LEVEL_MAX)
+    if (xlog_level >= XLOG_LEVEL_MAX || xlog_level > XLOG_COMPILE_LEVEL)
     {
         return XHAL_ERR_INVALID;
     }
     xlog_level = level;
+
+    return XHAL_OK;
+}
+
+uint8_t xlog_get_time_mod(void)
+{
+    return xlog_time_mod;
+}
+
+xhal_err_t xlog_set_time_mod(uint8_t mod)
+{
+
+    if (xlog_time_mod >= XLOG_TIME_MOD_MAX)
+    {
+        return XHAL_ERR_INVALID;
+    }
+    xlog_time_mod = mod;
 
     return XHAL_OK;
 }
@@ -99,16 +112,21 @@ xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...)
     xhal_err_t ret = XHAL_OK;
 
 #ifdef XHAL_OS_SUPPORTING
+    osStatus_t ret_os = osOK;
     osMutexId_t mutex = _xlog_mutex();
-    osMutexAcquire(mutex, osWaitForever);
+    ret_os            = osMutexAcquire(mutex, osWaitForever);
+    if (ret_os != osOK)
+    {
+        return XHAL_ERROR;
+    }
 #else
-    char buff[XLOG_BUFF_SIZE];
+    char xlog_buff[XLOG_BUFF_SIZE];
 #endif
 
     va_list args;
     va_start(args, fmt);
 
-    int32_t count = vsnprintf(buff, sizeof(buff), fmt, args);
+    int32_t count = vsnprintf(xlog_buff, sizeof(xlog_buff), fmt, args);
 
     va_end(args);
 
@@ -117,12 +135,12 @@ xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...)
         ret = XHAL_ERR_INVALID;
         goto exit;
     }
-    if (count >= sizeof(buff))
+    if (count >= sizeof(xlog_buff))
     {
         ret = XHAL_ERR_NO_MEMORY;
     }
 
-    write(buff, count);
+    write(xlog_buff, count);
 
 exit:
 #ifdef XHAL_OS_SUPPORTING
@@ -140,53 +158,76 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
     if (xlog_level < level)
         return XHAL_OK;
 
-    xhal_err_t ret = XHAL_OK;
-
 #ifdef XHAL_OS_SUPPORTING
+    osStatus_t ret_os = osOK;
     osMutexId_t mutex = _xlog_mutex();
-    osMutexAcquire(mutex, osWaitForever);
+    ret_os            = osMutexAcquire(mutex, osWaitForever);
+    if (ret_os != osOK)
+    {
+        return XHAL_ERROR;
+    }
+#else
+    char xlog_buff[XLOG_BUFF_SIZE];
 #endif
 
-    char buff[XLOG_BUFF_SIZE];
-    int32_t count = 0;
-    int32_t size  = 0;
-    uint32_t len  = 0;
-    XHAL_UNUSED(len);
+    xhal_err_t ret    = XHAL_OK;
+    int32_t count     = 0;
+    int32_t size      = 0;
+    size_t len        = 0;
+    char str_buff[32] = {0};
 
-#if XLOG_TIME_MODE == XLOG_TIME_MILLIS
-    char str_buff[sizeof("XXXXXXXXXXX")];
-    snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
-#elif XLOG_TIME_MODE == XLOG_TIME_RELATIVE
-    char str_buff[sizeof("HHHHH:MM:SS.XXX")];
-    xtime_get_format_uptime(str_buff, sizeof(str_buff));
-#elif XLOG_TIME_MODE == XLOG_TIME_ABSOLUTE
-    char str_buff[sizeof("YYYY-MM-DD HH:MM:SS")];
-    ret = xtime_get_format_time(str_buff, sizeof(str_buff));
-    if (ret != XHAL_OK)
+    switch (xlog_time_mod)
+    {
+    case XLOG_TIME_MOD_MILLIS:
         snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
-#endif
+        break;
 
-#if XLOG_COLOR_ENABLE != 0
-#if (XLOG_TIME_MODE == XLOG_TIME_MILLIS) ||   \
-    (XLOG_TIME_MODE == XLOG_TIME_RELATIVE) || \
-    (XLOG_TIME_MODE == XLOG_TIME_ABSOLUTE)
-    count =
-        snprintf(buff, sizeof(buff), "%s[%c/%s %s] ", xlog_color_table[level],
-                 xlog_level_lable[level], name, str_buff);
+    case XLOG_TIME_MOD_RELATIVE:
+        ret = xtime_get_format_uptime(str_buff, sizeof(str_buff));
+        break;
+
+    case XLOG_TIME_MOD_ABSOLUTE:
+        ret = xtime_get_format_time(str_buff, sizeof(str_buff));
+        break;
+
+    case XLOG_TIME_MOD_NONE:
+        str_buff[0] = '\0';
+        break;
+
+    default:
+        snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
+        break;
+    }
+
+    if (ret != XHAL_OK)
+    {
+        snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
+    }
+
+#if XLOG_COLOR_ENABLE
+    if (xlog_time_mod == XLOG_TIME_MOD_NONE)
+    {
+        count =
+            snprintf(xlog_buff, sizeof(xlog_buff), "%s[%c/%s] ",
+                     xlog_color_table[level], xlog_level_lable[level], name);
+    }
+    else
+    {
+        count = snprintf(xlog_buff, sizeof(xlog_buff), "%s[%c/%s %s] ",
+                         xlog_color_table[level], xlog_level_lable[level], name,
+                         str_buff);
+    }
 #else
-    count = snprintf(buff, sizeof(buff), "%s[%c/%s] ", xlog_color_table[level],
-                     xlog_level_lable[level], name);
-#endif
-#else
-#if (XLOG_TIME_MODE == XLOG_TIME_MILLIS) ||   \
-    (XLOG_TIME_MODE == XLOG_TIME_RELATIVE) || \
-    (XLOG_TIME_MODE == XLOG_TIME_ABSOLUTE)
-    count = snprintf(buff, sizeof(buff), "[%c/%s %s] ", xlog_level_lable[level],
-                     name, str_buff);
-#else
-    count =
-        snprintf(buff, sizeof(buff), "[%c/%s] ", xlog_level_lable[level], name);
-#endif
+    if (xlog_time_mod == XLOG_TIME_MOD_NONE)
+    {
+        count = snprintf(xlog_buff, sizeof(xlog_buff), "[%c/%s %s] ",
+                         xlog_level_lable[level], name, str_buff);
+    }
+    else
+    {
+        count = snprintf(xlog_buff, sizeof(xlog_buff), "[%c/%s] ",
+                         xlog_level_lable[level], name);
+    }
 #endif /* XLOG_COLOR_ENABLE */
 
     if (count < 0)
@@ -194,16 +235,16 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
         ret = XHAL_ERR_INVALID;
         goto exit;
     }
-    if (count >= sizeof(buff))
+    if (count >= sizeof(xlog_buff))
     {
-        count = sizeof(buff);
+        count = sizeof(xlog_buff);
         ret   = XHAL_ERR_NO_MEMORY;
         goto write;
     }
 
     va_list args;
     va_start(args, fmt);
-    size = vsnprintf(buff + count, sizeof(buff) - count, fmt, args);
+    size = vsnprintf(xlog_buff + count, sizeof(xlog_buff) - count, fmt, args);
     va_end(args);
 
     if (size < 0)
@@ -211,9 +252,9 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
         ret = XHAL_ERR_INVALID;
         goto exit;
     }
-    if (size >= (sizeof(buff) - count))
+    if (size >= (sizeof(xlog_buff) - count))
     {
-        count = sizeof(buff);
+        count = sizeof(xlog_buff);
         ret   = XHAL_ERR_NO_MEMORY;
         goto write;
     }
@@ -221,24 +262,24 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
 
 #if XLOG_NEWLINE_ENABLE != 0
     len = strlen(XHAL_STR_ENTER);
-    if ((sizeof(buff) - count) >= len)
+    if ((sizeof(xlog_buff) - count) >= len)
     {
-        xmemcpy(buff + count, XHAL_STR_ENTER, len);
+        xmemcpy(xlog_buff + count, XHAL_STR_ENTER, len);
         count += len;
     }
 #endif
 
 #if XLOG_COLOR_ENABLE != 0
     len = strlen(NONE);
-    if ((sizeof(buff) - count) >= len)
+    if ((sizeof(xlog_buff) - count) >= len)
     {
-        xmemcpy(buff + count, NONE, len);
+        xmemcpy(xlog_buff + count, NONE, len);
         count += len;
     }
 #endif
 
 write:
-    write(buff, count);
+    write(xlog_buff, count);
 
 exit:
 #ifdef XHAL_OS_SUPPORTING

@@ -6,12 +6,18 @@
 #include "xhal_config.h"
 #include "xhal_def.h"
 
-#define XLOG_LEVEL_NULL    (0)
-#define XLOG_LEVEL_ERROR   (1) /* 错误级别，只输出错误信息 */
-#define XLOG_LEVEL_WARNING (2) /* 警告级别，输出警告信息 */
-#define XLOG_LEVEL_INFO    (3) /* 信息级别，输出一般信息 */
-#define XLOG_LEVEL_DEBUG   (4) /* 调试级别，输出最详细的调试信息 */
-#define XLOG_LEVEL_MAX     (5)
+#define XLOG_LEVEL_NULL        (0)
+#define XLOG_LEVEL_ERROR       (1) /* 错误级别，只输出错误信息 */
+#define XLOG_LEVEL_WARNING     (2) /* 警告级别，输出警告信息 */
+#define XLOG_LEVEL_INFO        (3) /* 信息级别，输出一般信息 */
+#define XLOG_LEVEL_DEBUG       (4) /* 调试级别，输出最详细的调试信息 */
+#define XLOG_LEVEL_MAX         (5)
+
+#define XLOG_TIME_MOD_NONE     (0) /* 不显示时间 */
+#define XLOG_TIME_MOD_MILLIS   (1) /* 毫秒时间戳 */
+#define XLOG_TIME_MOD_RELATIVE (2) /* 相对时间 */
+#define XLOG_TIME_MOD_ABSOLUTE (3) /* 绝对时间 */
+#define XLOG_TIME_MOD_MAX      (4)
 
 #ifndef XLOG_COMPILE_LEVEL
 #define XLOG_COMPILE_LEVEL (XLOG_LEVEL_DEBUG)
@@ -46,7 +52,9 @@
 typedef void (*xlog_output_t)(const void *data, uint32_t size);
 
 uint8_t xlog_get_level(void);
+uint8_t xlog_get_time_mod(void);
 xhal_err_t xlog_set_level(uint8_t level);
+xhal_err_t xlog_set_time_mod(uint8_t mod);
 
 xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...);
 xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
