@@ -6,6 +6,17 @@
 
 XLOG_TAG("xMalloc");
 
+#ifdef XHAL_OS_SUPPORTING
+#include "../xos/xhal_os.h"
+
+#include "../xos/FreeRTOS/include/task.h"
+#define XMALLOC_ENTER_CRITICAL() vTaskSuspendAll()
+#define XMALLOC_EXIT_CRITICAL()  (void)xTaskResumeAll()
+#else
+#define XMALLOC_ENTER_CRITICAL()
+#define XMALLOC_EXIT_CRITICAL()
+#endif
+
 static XHAL_USED XHAL_ALIGN(64) uint8_t xmem_internal_ram[XMALLOC_MAX_SIZE];
 static uint16_t xmem_internal_map[XMALLOC_ALLOC_TABLE_SIZE];
 

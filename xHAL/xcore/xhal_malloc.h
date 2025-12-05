@@ -4,16 +4,6 @@
 #include "xhal_config.h"
 #include "xhal_std.h"
 
-#ifdef XHAL_OS_SUPPORTING
-#include "../xos/xhal_os.h"
-
-#define XMALLOC_ENTER_CRITICAL() osKernelLock()
-#define XMALLOC_EXIT_CRITICAL()  osKernelUnlock()
-#else
-#define XMALLOC_ENTER_CRITICAL()
-#define XMALLOC_EXIT_CRITICAL()
-#endif
-
 #ifndef XMALLOC_BLOCK_SIZE
 #define XMALLOC_BLOCK_SIZE (32)
 #endif
