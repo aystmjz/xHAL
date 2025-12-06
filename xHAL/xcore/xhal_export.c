@@ -17,20 +17,28 @@ XLOG_TAG("xExport");
 #ifdef XHAL_OS_SUPPORTING
 #include "../xos/xhal_os.h"
 
-#define XEXPORT_THREAD_OVERHEAD    (160)
-#define XEXPORT_DEFAULT_STACK_SIZE (1024)
-#define XEXPORT_DEFAULT_PRIORITY   (osPriorityNormal)
+#define XEXPORT_POLL_WAKE_FLAG              (1U << 0)
+#define XEXPORT_POLL_EXIT_WAIT_MAX_MS       (5000)
+#define XEXPORT_POLL_EXIT_CHECK_INTERVAL_MS (1000)
+
+#define XEXPORT_THREAD_OVERHEAD             (160)
+#define XEXPORT_MAX_POLL_THREADS            (32)
+#define XEXPORT_DEFAULT_STACK_SIZE          (1024)
+#define XEXPORT_DEFAULT_PRIORITY            (osPriorityNormal)
 
 #ifndef XEXPORT_THREAD_STACK_SIZE
 #define XEXPORT_THREAD_STACK_SIZE (1024)
 #endif
 
-static osMutexId_t _xexport_mutex(void);
+bool xhal_shutdown_req                = 0;
+osEventFlagsId_t xhal_poll_exit_event = NULL;
 
-static osMutexId_t xexport_mutex              = NULL;
-static const osMutexAttr_t xexport_mutex_attr = {
-    .name      = "xexport_mutex",
-    .attr_bits = osMutexPrioInherit | osMutexRecursive,
+static osThreadId_t xexport_poll_thread_ids[XEXPORT_MAX_POLL_THREADS];
+static uint32_t xexport_poll_thread_ids_count = 0;
+
+static const osEventFlagsAttr_t xexport_poll_wake_flag_attr = {
+    .name      = "xexport_poll_wake_flag",
+    .attr_bits = 0,
     .cb_mem    = NULL,
     .cb_size   = 0,
 };
@@ -70,19 +78,15 @@ static void null_exit(void)
 }
 EXIT_EXPORT(null_exit, EXPORT_LEVEL_NULL);
 
-bool xhal_shutdown = 0;
+static const xhal_export_t *xexport_poll_table = NULL; /* 轮询导出表 */
+static const xhal_export_t *xexport_init_table = NULL; /* 初始化导出表 */
+static const xhal_export_t *xexport_exit_table = NULL; /* 退出导出表 */
 
-static uint32_t poll_thread_alive_count = 0;
-
-static const xhal_export_t *export_poll_table = NULL; /* 轮询导出表 */
-static const xhal_export_t *export_init_table = NULL; /* 初始化导出表 */
-static const xhal_export_t *export_exit_table = NULL; /* 退出导出表 */
-
-static uint32_t export_poll_count    = 0; /* 轮询导出函数计数 */
-static uint32_t export_init_count    = 0; /* 初始化导出函数计数 */
-static uint32_t export_exit_count    = 0; /* 退出导出函数计数 */
-static int16_t export_init_level_max = 0; /* 最大初始化导出级别 */
-static int16_t export_exit_level_max = 0; /* 最大退出导出级别 */
+static uint32_t xexport_poll_count    = 0; /* 轮询导出函数计数 */
+static uint32_t xexport_init_count    = 0; /* 初始化导出函数计数 */
+static uint32_t xexport_exit_count    = 0; /* 退出导出函数计数 */
+static int16_t xexport_init_level_max = 0; /* 最大初始化导出级别 */
+static int16_t xexport_exit_level_max = 0; /* 最大退出导出级别 */
 
 /**
  * @brief  eLab启动函数
@@ -123,7 +127,7 @@ void xhal_run(void)
     {
     }
 #else
-    for (uint16_t level = 0; level <= export_init_level_max; level++)
+    for (uint16_t level = 0; level <= xexport_init_level_max; level++)
     {
         _export_init_func(level);
     }
@@ -149,40 +153,90 @@ void xhal_exit(void)
 #ifdef XHAL_OS_SUPPORTING
     XLOG_INFO("Stopping poll threads...");
 
-    osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xexport_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
+    xhal_shutdown_req = true;
 
-    poll_thread_alive_count--;
-
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
-
-    xhal_shutdown = true;
-
-    uint32_t wait_ms        = 0;
-    const uint32_t wait_max = 5000;
-
-    while (poll_thread_alive_count > 0 && wait_ms < wait_max)
+    if (xhal_poll_exit_event != NULL)
     {
-        osDelay(1);
-        wait_ms++;
+        osEventFlagsSet(xhal_poll_exit_event, XEXPORT_POLL_WAKE_FLAG);
     }
 
-    if (poll_thread_alive_count > 0)
+    osThreadId_t current_tid      = osThreadGetId();
+    uint32_t wait_ms              = 0;
+    const uint32_t wait_max       = XEXPORT_POLL_EXIT_WAIT_MAX_MS;
+    const uint32_t check_interval = XEXPORT_POLL_EXIT_CHECK_INTERVAL_MS;
+
+    uint32_t active_threads = 0;
+    for (uint32_t i = 0; i < xexport_poll_thread_ids_count; i++)
     {
-        XLOG_WARN("Some poll threads did not exit in time");
+        if (xexport_poll_thread_ids[i] == current_tid)
+        {
+            xexport_poll_thread_ids[i] = NULL;
+            continue;
+        }
+
+        if (xexport_poll_thread_ids[i] != NULL)
+        {
+            active_threads++;
+        }
+    }
+
+    while (active_threads > 0 && wait_ms < wait_max)
+    {
+        osDelay(XOS_MS_TO_TICKS(check_interval));
+        wait_ms += check_interval;
+
+        active_threads = 0;
+        for (uint32_t i = 0; i < xexport_poll_thread_ids_count; i++)
+        {
+            if (xexport_poll_thread_ids[i] != NULL)
+            {
+                active_threads++;
+            }
+        }
+
+        XLOG_DEBUG(
+            "Waiting for threads to exit: %lu threads remaining, waited %lu ms",
+            active_threads, wait_ms);
+    }
+
+    if (active_threads > 0)
+    {
+        XLOG_WARN("%lu poll threads did not exit in time.", active_threads);
+
+        for (uint32_t i = 0; i < xexport_poll_thread_ids_count; i++)
+        {
+            if (xexport_poll_thread_ids[i] != NULL)
+            {
+                osThreadState_t state =
+                    osThreadGetState(xexport_poll_thread_ids[i]);
+                const char *name = osThreadGetName(xexport_poll_thread_ids[i]);
+                osPriority_t priority =
+                    osThreadGetPriority(xexport_poll_thread_ids[i]);
+
+                XLOG_WARN("Forcing termination of thread: %s, state: %d, "
+                          "priority: %d",
+                          name ? name : "unknown", state, priority);
+
+                osThreadTerminate(xexport_poll_thread_ids[i]);
+                xexport_poll_thread_ids[i] = NULL;
+            }
+        }
+    }
+
+    if (xhal_poll_exit_event != NULL)
+    {
+        osEventFlagsDelete(xhal_poll_exit_event);
+        xhal_poll_exit_event = NULL;
     }
 #endif
 
     XLOG_INFO("Run exit funcs...");
 
-    for (int16_t level = export_exit_level_max; level >= 0; level--)
+    for (int16_t level = xexport_exit_level_max; level >= 0; level--)
     {
-        for (uint32_t i = 0; i < export_exit_count; i++)
+        for (uint32_t i = 0; i < xexport_exit_count; i++)
         {
-            const xhal_export_t *exp = &export_exit_table[i];
+            const xhal_export_t *exp = &xexport_exit_table[i];
             if (exp->level != level)
                 continue;
 
@@ -218,18 +272,18 @@ static void _get_init_export_table(void)
         }
         func_block = table;
     }
-    export_init_table = func_block; /* 设置初始化导出表起始地址 */
+    xexport_init_table = func_block; /* 设置初始化导出表起始地址 */
 
     uint32_t i = 0;
     while (1)
     {
-        if (export_init_table[i].magic_head == EXPORT_ID_INIT &&
-            export_init_table[i].magic_tail == EXPORT_ID_INIT)
+        if (xexport_init_table[i].magic_head == EXPORT_ID_INIT &&
+            xexport_init_table[i].magic_tail == EXPORT_ID_INIT)
         {
-            if (export_init_table[i].level > export_init_level_max)
+            if (xexport_init_table[i].level > xexport_init_level_max)
             {
                 /* 更新最大导出级别 */
-                export_init_level_max = export_init_table[i].level;
+                xexport_init_level_max = xexport_init_table[i].level;
             }
             i++;
         }
@@ -238,10 +292,10 @@ static void _get_init_export_table(void)
             break; /* 如果不是有效的初始化导出项，则退出循环 */
         }
     }
-    export_init_count = i; /* 设置初始化导出函数计数 */
+    xexport_init_count = i; /* 设置初始化导出函数计数 */
 
-    XLOG_DEBUG("Export init table: %d", export_init_count);
-    XLOG_DEBUG("Export init level max: %d", export_init_level_max);
+    XLOG_DEBUG("Export init table: %d", xexport_init_count);
+    XLOG_DEBUG("Export init level max: %d", xexport_init_level_max);
 }
 
 static void _get_exit_export_table(void)
@@ -261,18 +315,18 @@ static void _get_exit_export_table(void)
         func_block = table;
     }
 
-    export_exit_table = func_block;
+    xexport_exit_table = func_block;
 
     uint32_t i = 0;
     while (1)
     {
-        if (export_exit_table[i].magic_head == EXPORT_ID_EXIT &&
-            export_exit_table[i].magic_tail == EXPORT_ID_EXIT)
+        if (xexport_exit_table[i].magic_head == EXPORT_ID_EXIT &&
+            xexport_exit_table[i].magic_tail == EXPORT_ID_EXIT)
         {
-            if (export_exit_table[i].level > export_exit_level_max)
+            if (xexport_exit_table[i].level > xexport_exit_level_max)
             {
                 /* 更新最大导出级别 */
-                export_exit_level_max = export_exit_table[i].level;
+                xexport_exit_level_max = xexport_exit_table[i].level;
             }
             i++;
         }
@@ -282,10 +336,10 @@ static void _get_exit_export_table(void)
         }
     }
 
-    export_exit_count = i; /* 设置退出导出函数计数 */
+    xexport_exit_count = i; /* 设置退出导出函数计数 */
 
-    XLOG_DEBUG("Export exit table: %d", export_exit_count);
-    XLOG_DEBUG("Export exit level max: %d", export_exit_level_max);
+    XLOG_DEBUG("Export exit table: %d", xexport_exit_count);
+    XLOG_DEBUG("Export exit level max: %d", xexport_exit_level_max);
 }
 
 static void _get_poll_export_table(void)
@@ -304,19 +358,19 @@ static void _get_poll_export_table(void)
         }
         func_block = table;
     }
-    export_poll_table = func_block; /* 设置轮询导出表起始地址 */
+    xexport_poll_table = func_block; /* 设置轮询导出表起始地址 */
 
     uint32_t i = 0;
     while (1)
     {
-        if (export_poll_table[i].magic_head == EXPORT_ID_POLL &&
-            export_poll_table[i].magic_tail == EXPORT_ID_POLL)
+        if (xexport_poll_table[i].magic_head == EXPORT_ID_POLL &&
+            xexport_poll_table[i].magic_tail == EXPORT_ID_POLL)
         {
             xhal_export_poll_data_t *data =
-                (xhal_export_poll_data_t *)export_poll_table[i].data;
+                (xhal_export_poll_data_t *)xexport_poll_table[i].data;
             /* 设置超时时间 */
             data->timeout_ms =
-                xtime_get_tick_ms() + export_poll_table[i].period_ms;
+                xtime_get_tick_ms() + xexport_poll_table[i].period_ms;
             i++;
         }
         else
@@ -324,31 +378,31 @@ static void _get_poll_export_table(void)
             break; /* 如果不是有效的轮询导出项，则退出循环 */
         }
     }
-    export_poll_count = i; /* 设置轮询导出函数计数 */
+    xexport_poll_count = i; /* 设置轮询导出函数计数 */
 
-    XLOG_DEBUG("Export poll table: %d", export_poll_count);
+    XLOG_DEBUG("Export poll table: %d", xexport_poll_count);
 }
 
 static void _export_init_func(int16_t level)
 {
-    for (uint32_t i = 0; i < export_init_count; i++)
+    for (uint32_t i = 0; i < xexport_init_count; i++)
     {
-        if (export_init_table[i].level == level)
+        if (xexport_init_table[i].level == level)
         {
 #ifdef XHAL_UNIT_TEST
             if (level == EXPORT_LEVEL_TEST)
             {
-                XLOG_INFO("Export unit test: %s", export_init_table[i].name);
-                const char *argv[] = {export_init_table[i].name, "-v"};
+                XLOG_INFO("Export unit test: %s", xexport_init_table[i].name);
+                const char *argv[] = {xexport_init_table[i].name, "-v"};
                 int argc           = 2;
                 UnityMain(argc, argv,
-                          ((void (*)(void))export_init_table[i].func));
+                          ((void (*)(void))xexport_init_table[i].func));
                 continue;
             }
 #endif
-            XLOG_INFO("Export init: %s", export_init_table[i].name);
+            XLOG_INFO("Export init: %s", xexport_init_table[i].name);
 
-            ((void (*)(void))export_init_table[i].func)();
+            ((void (*)(void))xexport_init_table[i].func)();
         }
     }
 }
@@ -356,7 +410,7 @@ static void _export_init_func(int16_t level)
 #ifdef XHAL_OS_SUPPORTING
 static void _entry_start_export(void *para)
 {
-    for (uint16_t level = 0; level <= export_init_level_max; level++)
+    for (uint16_t level = 0; level <= xexport_init_level_max; level++)
     {
         _export_init_func(level);
     }
@@ -380,32 +434,25 @@ static void _entry_start_export(void *para)
 
 static void _poll_thread(void *arg)
 {
-    xhal_export_t *export = (xhal_export_t *)arg;
-    uint32_t period_ticks = XOS_MS_TO_TICKS(export->period_ms);
-    uint32_t next_wake    = osKernelGetTickCount() + period_ticks;
+    xhal_export_t *export       = (xhal_export_t *)arg;
+    const uint32_t period_ticks = XOS_MS_TO_TICKS(export->period_ms);
 
 #ifdef XDEBUG
     XLOG_DEBUG("Poll thread started: %s, period: %lu ms(%lu ticks)",
                export->name, export->period_ms, period_ticks);
 #endif
 
-    osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xexport_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
-
-    poll_thread_alive_count++;
-
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
+    uint32_t next_wake = osKernelGetTickCount();
 
     while (1)
     {
+        next_wake += period_ticks;
+
         uint32_t start = osKernelGetTickCount();
-
         ((void (*)(void)) export->func)();
+        uint32_t end = osKernelGetTickCount();
 
-        if (xhal_shutdown)
+        if (xhal_shutdown_req)
         {
             break;
         }
@@ -415,55 +462,74 @@ static void _poll_thread(void *arg)
             continue;
         }
 
-        uint32_t end        = osKernelGetTickCount();
         uint32_t exec_ticks = end - start;
 
         if (exec_ticks > period_ticks)
         {
+
             XLOG_WARN("Poll task '%s' execution overrun: %lu > %lu ticks",
                       export->name, exec_ticks, period_ticks);
         }
 
-        next_wake += period_ticks;
-        osDelayUntil(next_wake);
+        int32_t wait_ticks = (int32_t)(next_wake - end);
+
+        if (wait_ticks > 0)
+        {
+            uint32_t flags =
+                osEventFlagsWait(xhal_poll_exit_event, XEXPORT_POLL_WAKE_FLAG,
+                                 osFlagsWaitAny, wait_ticks);
+            if ((flags & XEXPORT_POLL_WAKE_FLAG) != 0)
+            {
+                break;
+            }
+        }
+        else
+        {
+            next_wake = end;
+        }
     }
 
-    ret_os = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
-
-    poll_thread_alive_count--;
-
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
+    osThreadId_t current_tid = osThreadGetId();
+    for (uint32_t i = 0; i < xexport_poll_thread_ids_count; i++)
+    {
+        if (xexport_poll_thread_ids[i] == current_tid)
+        {
+            xexport_poll_thread_ids[i] = NULL;
+            break;
+        }
+    }
 
     osThreadExit();
 }
 
 static void _export_poll_func(void)
 {
-    for (uint32_t i = 0; i < export_poll_count; i++)
+    xhal_poll_exit_event = osEventFlagsNew(&xexport_poll_wake_flag_attr);
+    xassert_not_null(xhal_poll_exit_event);
+
+    for (uint32_t i = 0; i < xexport_poll_count; i++)
     {
-        if ((xhal_pointer_t)&export_poll_table[i] ==
+        if ((xhal_pointer_t)&xexport_poll_table[i] ==
             (xhal_pointer_t)&poll_null_poll)
             continue;
 
         osThreadAttr_t attr = {
             .attr_bits = osThreadDetached,
-            .name      = export_poll_table[i].name,
+            .name      = xexport_poll_table[i].name,
         };
 
-        if (export_poll_table[i].priority != osPriorityNone)
+        if (xexport_poll_table[i].priority != osPriorityNone)
         {
-            attr.priority = export_poll_table[i].priority;
+            attr.priority = xexport_poll_table[i].priority;
         }
         else
         {
             attr.priority = XEXPORT_DEFAULT_PRIORITY;
         }
 
-        if (export_poll_table[i].stack_size != 0)
+        if (xexport_poll_table[i].stack_size != 0)
         {
-            attr.stack_size = export_poll_table[i].stack_size;
+            attr.stack_size = xexport_poll_table[i].stack_size;
         }
         else
         {
@@ -478,24 +544,36 @@ static void _export_poll_func(void)
         {
             XLOG_ERROR("Poll thread no memory: %s, free size: %lu bytes, "
                        "required: %lu bytes (stack: %lu + overhead: %u)",
-                       export_poll_table[i].name, free_size,
+                       xexport_poll_table[i].name, free_size,
                        attr.stack_size + XEXPORT_THREAD_OVERHEAD,
                        attr.stack_size, XEXPORT_THREAD_OVERHEAD);
             continue;
         }
+
         osThreadId_t tid =
-            osThreadNew(_poll_thread, (void *)&export_poll_table[i], &attr);
+            osThreadNew(_poll_thread, (void *)&xexport_poll_table[i], &attr);
+
         if (tid == NULL)
         {
             XLOG_ERROR("Poll thread creation failed: %s", attr.name);
         }
         else
         {
+            if (i < XEXPORT_MAX_POLL_THREADS)
+            {
+                xexport_poll_thread_ids[i] = tid;
+                xexport_poll_thread_ids_count++;
+            }
+            else
+            {
+                XLOG_WARN("Too many poll threads, cannot track: %s", attr.name);
+            } /* end of if (xexport_poll_count < XEXPORT_MAX_POLL_THREADS) */
+
 #ifdef XDEBUG
             XLOG_DEBUG("Poll thread created: %s, stack size: %lu bytes",
                        attr.name, attr.stack_size);
 #endif
-        }
+        } /* end of if (tid == NULL) */
     }
 }
 #else
@@ -506,42 +584,29 @@ static void _export_poll_func(void)
 
     while (1)
     {
-        for (uint32_t i = 0; i < export_poll_count; i++)
+        for (uint32_t i = 0; i < xexport_poll_count; i++)
         {
-            data = export_poll_table[i].data;
+            data = xexport_poll_table[i].data;
 
             uint64_t time = xtime_get_tick_ms();
 
             if (time >= data->timeout_ms)
             {
                 /* 更新超时时间 */
-                data->timeout_ms = time + export_poll_table[i].period_ms;
+                data->timeout_ms = time + xexport_poll_table[i].period_ms;
 
-                ((void (*)(void))export_poll_table[i].func)();
+                ((void (*)(void))xexport_poll_table[i].func)();
 
                 uint64_t after_time = xtime_get_tick_ms();
 
                 if (after_time >= data->timeout_ms)
                 {
                     XLOG_WARN("Poll function %s execution time exceeds period",
-                              export_poll_table[i].name);
+                              xexport_poll_table[i].name);
                 }
-            }
-        }
-    }
+            } /* if (time >= data->timeout_ms) */
+        } /* for (uint32_t i = 0; i < xexport_poll_count; i++) */
+    } /* while (1) */
 }
 
-#endif
-
-#ifdef XHAL_OS_SUPPORTING
-static osMutexId_t _xexport_mutex(void)
-{
-    if (xexport_mutex == NULL)
-    {
-        xexport_mutex = osMutexNew(&xexport_mutex_attr);
-        xassert_not_null(_xexport_mutex);
-    }
-
-    return xexport_mutex;
-}
 #endif

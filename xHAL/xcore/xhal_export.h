@@ -40,7 +40,7 @@ typedef struct xhal_export
     const char *name;    /* 导出函数名称 */
     void *func;          /* 导出函数 */
     void *data;          /* 导出函数数据 */
-    uint8_t type;        /* 导出类型（保留字段） */
+    uint16_t type;        /* 导出类型（保留字段） */
     int16_t level;       /* 导出级别 */
     uint32_t period_ms;  /* 轮询周期 */
 #ifdef XHAL_OS_SUPPORTING
@@ -49,6 +49,9 @@ typedef struct xhal_export
 #endif
     uint32_t magic_tail; /* 尾部魔数 */
 } xhal_export_t;
+
+extern bool xhal_shutdown_req;
+extern osEventFlagsId_t xhal_poll_exit_event;
 
 void xhal_run(void);
 void xhal_exit(void);
