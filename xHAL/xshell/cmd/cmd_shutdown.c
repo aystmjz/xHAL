@@ -16,7 +16,7 @@ static int shutdown_cmd(int argc, char *argv[])
 
     if (argc > 1)
     {
-        shellPrint(shell, "usage: shutdown\r\n");
+        shellPrint(shell, "usage:\r\n");
         shellPrint(shell, CMD_SHUTDOWN_DESCRIPTION);
         return -1;
     }

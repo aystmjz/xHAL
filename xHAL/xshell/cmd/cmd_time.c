@@ -10,7 +10,7 @@
     " -u: display uptime\r\n"             \
     " -c: display current time\r\n"       \
     " -s: set current time with timestamp (Unix timestamp)\r\n"
-    
+
 #if SHELL_CMD_IS_ENABLED(TIME)
 static int time_cmd(int argc, char *argv[])
 {
@@ -19,7 +19,8 @@ static int time_cmd(int argc, char *argv[])
 
     if (argc > 3)
     {
-        shellPrint(shell, "usage:\r\n\r\n" CMD_TIME_CDISCRIPTION);
+        shellPrint(shell, "usage:\r\n");
+        shellPrint(shell, CMD_TIME_CDISCRIPTION);
         return -1;
     }
 
@@ -46,7 +47,8 @@ static int time_cmd(int argc, char *argv[])
         else
         {
             shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n\r\n" CMD_TIME_CDISCRIPTION);
+            shellPrint(shell, "usage:\r\n");
+            shellPrint(shell, CMD_TIME_CDISCRIPTION);
             return -1;
         }
     }
@@ -61,7 +63,8 @@ static int time_cmd(int argc, char *argv[])
         else
         {
             shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n\r\n" CMD_TIME_CDISCRIPTION);
+            shellPrint(shell, "usage:\r\n");
+            shellPrint(shell, CMD_TIME_CDISCRIPTION);
             return -1;
         }
     }

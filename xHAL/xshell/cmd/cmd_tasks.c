@@ -19,7 +19,7 @@ static int tasks_cmd(int argc, char *argv[])
 
     if (argc > 1)
     {
-        shellPrint(shell, "usage: tasks\r\n");
+        shellPrint(shell, "usage:\r\n");
         shellPrint(shell, CMD_TASKS_DESCRIPTION);
         return -1;
     }
@@ -36,8 +36,12 @@ static int tasks_cmd(int argc, char *argv[])
     uint32_t count = osThreadEnumerate(thread_list, TASK_LIST_LEN);
 
     shellPrint(shell, "Thread List (total: %lu)\r\n", count);
-    shellPrint(shell, "Name           State      Priority   StackSize\r\n");
-    shellPrint(shell, "----------------------------------------------\r\n");
+    shellPrint(
+        shell,
+        "Handle        Name           State      Priority   StackSize\r\n");
+    shellPrint(
+        shell,
+        "-------------------------------------------------------------\r\n");
 
     for (uint32_t i = 0; i < count; i++)
     {
@@ -80,7 +84,8 @@ static int tasks_cmd(int argc, char *argv[])
             break;
         }
 
-        shellPrint(shell, "%-14s %-10s %-10d %lu\r\n", name, state_str, prio,
+        shellPrint(shell, "0x%08lx    %-14s %-10s %-10d %lu\r\n",
+                   (xhal_pointer_t)thread_list[i], name, state_str, prio,
                    stack_size);
     }
 

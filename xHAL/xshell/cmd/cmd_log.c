@@ -117,7 +117,7 @@ static int log_cmd(int argc, char *argv[])
 
     if (argc > 3)
     {
-        shellPrint(shell, "usage:\r\n\r\n");
+        shellPrint(shell, "usage:\r\n");
         shellPrint(shell, CMD_LOG_USAGE);
         shellPrint(shell, CMD_LOG_OPTIONS);
         return -1;
@@ -153,7 +153,7 @@ static int log_cmd(int argc, char *argv[])
         else
         {
             shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n\r\n");
+            shellPrint(shell, "usage:\r\n");
             shellPrint(shell, CMD_LOG_USAGE);
             shellPrint(shell, CMD_LOG_OPTIONS);
             return -1;
@@ -188,7 +188,7 @@ static int log_cmd(int argc, char *argv[])
         else
         {
             shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n\r\n");
+            shellPrint(shell, "usage:\r\n");
             shellPrint(shell, CMD_LOG_USAGE);
             shellPrint(shell, CMD_LOG_OPTIONS);
             return -1;

@@ -13,7 +13,7 @@ static int ver_cmd(int argc, char *argv[])
 
     if (argc > 1)
     {
-        shellPrint(shell, "usage: ver\r\n");
+        shellPrint(shell, "usage:\r\n");
         shellPrint(shell, CMD_VER_DESCRIPTION);
         return -1;
     }

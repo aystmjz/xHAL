@@ -33,7 +33,6 @@
 /* 表头字节数，可能会多几个字节 */
 #define XLOG_DUMP_TABLE_HEADER_BYTES              (332)
 
-
 #if SHELL_CMD_IS_ENABLED(DUMP)
 xhal_err_t dump_memory(Shell *shell, void *addr, xhal_size_t size,
                        uint8_t flags_mask)
@@ -220,7 +219,8 @@ static int dump_cmd(int argc, char *argv[])
 
     if (argc < 3 || argc > 4)
     {
-        shellPrint(shell, "usage:\r\n\r\n" CMD_DUMP_CDISCRIPTION);
+        shellPrint(shell, "usage:\r\n");
+        shellPrint(shell, CMD_DUMP_CDISCRIPTION);
         return -1;
     }
 

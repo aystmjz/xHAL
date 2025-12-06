@@ -14,7 +14,8 @@ static int meminfo_cmd(int argc, char *argv[])
 
     if (argc != 1)
     {
-        shellPrint(shell, "usage:\r\n\r\n" CMD_MEMINFO_DESCRIPTION);
+        shellPrint(shell, "usage:\r\n");
+        shellPrint(shell, CMD_MEMINFO_DESCRIPTION);
         return -1;
     }
 
