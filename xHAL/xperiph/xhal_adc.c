@@ -115,9 +115,9 @@ uint32_t xadc_read_raw(xhal_periph_t *self, uint16_t samples,
     }
     va_end(args);
 
-    xhal_adc_t *adc              = XADC_CAST(self);
-    xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
-    uint32_t samples_read        = 0;
+    xhal_adc_t *adc           = XADC_CAST(self);
+    xhal_tick_t start_tick_ms = xtime_get_tick_ms();
+    uint32_t samples_read     = 0;
 
     xperiph_lock(self);
     if (adc->data.config.mode == XADC_MODE_REALTIME)
@@ -142,7 +142,7 @@ uint32_t xadc_read_raw(xhal_periph_t *self, uint16_t samples,
         if (samples_read >= samples)
             break;
 
-        uint32_t elapsed_ms = xtime_get_tick_ms() - start_tick_ms;
+        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
         if (elapsed_ms >= timeout_ms)
             break;
 
@@ -194,9 +194,9 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
     }
     va_end(args);
 
-    xhal_adc_t *adc              = XADC_CAST(self);
-    xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
-    uint32_t samples_read        = 0;
+    xhal_adc_t *adc           = XADC_CAST(self);
+    xhal_tick_t start_tick_ms = xtime_get_tick_ms();
+    uint32_t samples_read     = 0;
 
     xperiph_lock(self);
     float scale_factor = adc->data.config.reference_voltage /
@@ -224,7 +224,7 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
         if (samples_read >= samples)
             break;
 
-        uint32_t elapsed_ms = xtime_get_tick_ms() - start_tick_ms;
+        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
         if (elapsed_ms >= timeout_ms)
             break;
 

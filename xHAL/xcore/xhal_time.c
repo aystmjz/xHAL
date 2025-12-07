@@ -5,19 +5,19 @@
 
 XLOG_TAG("xTime");
 
-#define XTIME_INVALID_TS    (0)
-#define XTIME_ALLOWED_DRIFT (5)
+#define XTIME_NOP()      __NOP()
+#define XTIME_INVALID_TS (0)
 
 #ifndef XTIME_USE_DWT_DELAY
 #define XTIME_USE_DWT_DELAY (0)
 #endif
 
 #if XTIME_USE_DWT_DELAY == 0
-#include XHAL_CMSIS_DEVICE_HEADER
+#include XHAL_DEVICE_HEADER
 #endif
 
 #if XTIME_USE_DWT_DELAY != 0
-#include XHAL_CMSIS_DEVICE_HEADER
+#include XHAL_DEVICE_HEADER
 
 #if !defined(DWT) || !defined(DWT_CTRL_CYCCNTENA_Msk)
 #error \
@@ -52,63 +52,20 @@ static const osMutexAttr_t xtime_mutex_attr = {
 };
 #endif
 
-static volatile xhal_tick_ms_t xtime_sys_base_ms = 0; /* 系统基准毫秒计数器 */
+static volatile xhal_tick_t xtime_sys_tick_ms     = 0;
+static volatile xhal_uptime_t xtime_sys_uptime_ms = 0;
 
-static xhal_ts_t xtime_startup_ts = XTIME_INVALID_TS; /* 系统启动时的时间戳 */
-static xhal_ts_t xtime_base_ts = XTIME_INVALID_TS; /* 基准时间戳 */
+static xhal_tick_t xtime_sync_tick_ms = 0;
+static xhal_ts_t xtime_base_ts        = XTIME_INVALID_TS;
 
-xhal_tick_ms_t xtime_get_tick_ms(void)
+xhal_tick_t xtime_get_tick_ms(void)
 {
-#ifdef XHAL_OS_SUPPORTING
-    osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xtime_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
-#endif
-    xhal_tick_ms_t ret;
-
-    if (xtime_startup_ts == XTIME_INVALID_TS)
-    {
-        ret = xtime_sys_base_ms;
-    }
-    else
-    {
-        ret = ((xhal_tick_ms_t)(xtime_base_ts - xtime_startup_ts) * 1000ULL) +
-              xtime_sys_base_ms;
-    }
-
-#ifdef XHAL_OS_SUPPORTING
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
-#endif
-    return ret;
+    return xtime_sys_tick_ms;
 }
 
-xhal_tick_sec_t xtime_get_tick_sec(void)
+xhal_uptime_t xtime_get_uptime_ms(void)
 {
-#ifdef XHAL_OS_SUPPORTING
-    osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xtime_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
-#endif
-    xhal_tick_sec_t ret;
-    xhal_tick_sec_t sys_base_sec = (xhal_tick_sec_t)(xtime_sys_base_ms / 1000);
-
-    if (xtime_startup_ts == XTIME_INVALID_TS)
-    {
-        ret = sys_base_sec;
-    }
-    else
-    {
-        ret =
-            (xhal_tick_sec_t)(xtime_base_ts - xtime_startup_ts) + sys_base_sec;
-    }
-#ifdef XHAL_OS_SUPPORTING
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
-#endif
-    return ret;
+    return xtime_sys_uptime_ms;
 }
 
 void xtime_delay_us(uint32_t delay_us)
@@ -137,27 +94,48 @@ void xtime_delay_us(uint32_t delay_us)
     uint32_t count = delay_us * (XTIME_CPU_FREQ_HZ / 8U / 1000000U);
     while (count--)
     {
-        __NOP();
+        XTIME_NOP();
     }
 #endif
 }
 
 void xtime_delay_ms(uint32_t delay_ms)
 {
+    if (delay_ms == 0)
+    {
+        return;
+    }
+
 #ifdef XHAL_OS_SUPPORTING
     osDelay(XOS_MS_TO_TICKS(delay_ms));
 #else
-    xhal_tick_ms_t start = xtime_get_tick_ms();
-    while ((xtime_get_tick_ms() - start) < delay_ms)
+    xhal_tick_t start = xtime_get_tick_ms();
+    while (TIME_DIFF(xtime_get_tick_ms(), start) < delay_ms)
     {
-        __NOP();
+        XTIME_NOP();
     }
 #endif
 }
 
 void xtime_delay_s(uint32_t delay_s)
 {
-    xtime_delay_ms((xhal_tick_ms_t)delay_s * 1000ULL);
+    if (delay_s == 0)
+    {
+        return;
+    }
+
+    uint64_t total_ms = (uint64_t)delay_s * 1000ULL;
+
+    while (total_ms > UINT32_MAX)
+    {
+        xtime_delay_ms(UINT32_MAX);
+        total_ms -= UINT32_MAX;
+    }
+
+    if (total_ms > 0)
+    {
+        xtime_delay_ms((uint32_t)total_ms);
+    }
 }
 
 /**
@@ -166,19 +144,33 @@ void xtime_delay_s(uint32_t delay_s)
  * @param  buff_len 缓冲区长度
  * @retval 错误码
  */
-xhal_err_t xtime_get_format_uptime(char *time_str, uint8_t buff_len)
+xhal_err_t xtime_get_format_uptime(char *time_str, uint32_t buff_len)
 {
     xassert_not_null(time_str);
 
-    xhal_tick_sec_t total_seconds = xtime_get_tick_sec();
-    uint32_t hours                = total_seconds / 3600;
-    uint32_t minutes              = (total_seconds % 3600) / 60;
-    uint32_t seconds              = total_seconds % 60;
+    xhal_uptime_t uptime_ms = xtime_get_uptime_ms();
 
-    /* 格式化时间字符串，包含小时、分钟、秒和毫秒 */
-    uint32_t count =
-        snprintf(time_str, buff_len, "%01u:%02u:%02u.%03u", hours, minutes,
-                 seconds, (uint32_t)(xtime_sys_base_ms % 1000));
+    uint32_t total_seconds = uptime_ms / 1000;
+    uint32_t days          = total_seconds / (24 * 3600);
+    uint32_t hours         = (total_seconds % (24 * 3600)) / 3600;
+    uint32_t minutes       = (total_seconds % 3600) / 60;
+    uint32_t seconds       = total_seconds % 60;
+    uint32_t milliseconds  = uptime_ms % 1000;
+
+    uint32_t count;
+
+    if (days > 0)
+    {
+        /* "Dd HH:MM:SS.mmm" 或 "D HH:MM:SS.mmm" */
+        count = snprintf(time_str, buff_len, "%ud %02u:%02u:%02u.%03u", days,
+                         hours, minutes, seconds, milliseconds);
+    }
+    else
+    {
+        /* "HH:MM:SS.mmm" */
+        count = snprintf(time_str, buff_len, "%02u:%02u:%02u.%03u", hours,
+                         minutes, seconds, milliseconds);
+    }
 
     if (count >= buff_len)
     {
@@ -200,21 +192,23 @@ xhal_ts_t xtime_get_ts(void)
     ret_os            = osMutexAcquire(mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
-    xhal_ts_t ret;
+    xhal_ts_t ts;
 
     if (xtime_base_ts == XTIME_INVALID_TS)
     {
-        ret = XTIME_INVALID_TS; // 未设置基准时间
+        ts = XTIME_INVALID_TS;
     }
     else
     {
-        ret = xtime_base_ts + (xhal_ts_t)(xtime_sys_base_ms / 1000);
+        ts = xtime_base_ts +
+             (xhal_ts_t)(TIME_DIFF(xtime_sys_tick_ms, xtime_sync_tick_ms) /
+                         1000);
     }
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
-    return ret;
+    return ts;
 }
 
 /**
@@ -223,7 +217,7 @@ xhal_ts_t xtime_get_ts(void)
  * @param  buff_len 缓冲区长度
  * @retval 错误码
  */
-xhal_err_t xtime_get_format_time(char *time_str, uint8_t buff_len)
+xhal_err_t xtime_get_format_time(char *time_str, uint32_t buff_len)
 {
     xassert_not_null(time_str);
 
@@ -257,33 +251,23 @@ xhal_err_t xtime_get_format_time(char *time_str, uint8_t buff_len)
  */
 xhal_err_t xtime_sync_time(xhal_ts_t ts)
 {
-    /* 检查RTC时间是否有效 */
-    if (xtime_base_ts != XTIME_INVALID_TS &&
-        (ts + XTIME_ALLOWED_DRIFT) < xtime_base_ts)
+    if (ts == XTIME_INVALID_TS)
     {
         return XHAL_ERR_INVALID;
     }
+
 #ifdef XHAL_OS_SUPPORTING
     osStatus_t ret_os = osOK;
     osMutexId_t mutex = _xtime_mutex();
     ret_os            = osMutexAcquire(mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
-    /* 首次同步时间 */
-    if (xtime_startup_ts == XTIME_INVALID_TS)
-    {
-        xtime_startup_ts = ts - (xtime_sys_base_ms / 1000);
-        xtime_base_ts    = xtime_startup_ts;
-        XLOG_INFO("RTC time first sync completed, base timestamp: %u",
-                  xtime_base_ts);
-    }
-    else
-    {
-        /* 重新同步时间 */
-        xtime_sys_base_ms = 0;
-        xtime_base_ts     = ts;
-        XLOG_INFO("RTC time resync completed, timestamp: %u", ts);
-    }
+
+    xtime_sync_tick_ms = xtime_sys_tick_ms;
+    xtime_base_ts      = ts;
+
+    XLOG_INFO("RTC time resync completed, timestamp: %u", ts);
+
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
@@ -296,7 +280,8 @@ xhal_err_t xtime_sync_time(xhal_ts_t ts)
  */
 void xtime_ms_tick_handler(void)
 {
-    xtime_sys_base_ms++;
+    xtime_sys_tick_ms++;
+    xtime_sys_uptime_ms++;
 }
 
 #ifdef XHAL_OS_SUPPORTING

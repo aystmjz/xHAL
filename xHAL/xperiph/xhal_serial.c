@@ -105,9 +105,9 @@ uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial        = XSERIAL_CAST(self);
-    xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
-    uint32_t written             = 0;
+    xhal_serial_t *serial     = XSERIAL_CAST(self);
+    xhal_tick_t start_tick_ms = xtime_get_tick_ms();
+    uint32_t written          = 0;
 
 #ifdef XHAL_OS_SUPPORTING
     osStatus_t ret_os = osOK;
@@ -122,7 +122,7 @@ uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
         if (written >= size)
             break;
 
-        uint32_t elapsed_ms = xtime_get_tick_ms() - start_tick_ms;
+        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
 
         if (elapsed_ms >= timeout_ms)
             break;
@@ -151,9 +151,9 @@ uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
     if (size == 0)
         return 0;
 
-    xhal_serial_t *serial        = XSERIAL_CAST(self);
-    xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
-    uint32_t read                = 0;
+    xhal_serial_t *serial     = XSERIAL_CAST(self);
+    xhal_tick_t start_tick_ms = xtime_get_tick_ms();
+    uint32_t read             = 0;
 
 #ifdef XHAL_OS_SUPPORTING
     osStatus_t ret_os = osOK;
@@ -169,7 +169,7 @@ uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
         if (read >= size)
             break;
 
-        uint32_t elapsed_ms = xtime_get_tick_ms() - start_tick_ms;
+        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
         if (elapsed_ms >= timeout_ms)
             break;
 

@@ -75,9 +75,9 @@ xhal_err_t xi2c_transfer(xhal_periph_t *self, xhal_i2c_msg_t *msgs,
     if (num == 0)
         return XHAL_OK;
 
-    xhal_err_t ret               = XHAL_OK;
-    xhal_i2c_t *i2c              = XI2C_CAST(self);
-    xhal_tick_ms_t start_tick_ms = xtime_get_tick_ms();
+    xhal_err_t ret            = XHAL_OK;
+    xhal_i2c_t *i2c           = XI2C_CAST(self);
+    xhal_tick_t start_tick_ms = xtime_get_tick_ms();
 
     xperiph_lock(self);
 
@@ -106,7 +106,7 @@ xhal_err_t xi2c_transfer(xhal_periph_t *self, xhal_i2c_msg_t *msgs,
             goto exit;
         }
 
-        uint32_t elapsed_ms = xtime_get_tick_ms() - start_tick_ms;
+        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
         if (elapsed_ms >= timeout_ms)
         {
             ret = XHAL_ERR_TIMEOUT;

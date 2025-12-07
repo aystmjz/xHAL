@@ -173,13 +173,13 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
     xhal_err_t ret    = XHAL_OK;
     int32_t count     = 0;
     int32_t size      = 0;
-    size_t len        = 0;
+    xhal_size_t len   = 0;
     char str_buff[32] = {0};
 
     switch (xlog_time_mod)
     {
     case XLOG_TIME_MOD_MILLIS:
-        snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
+        snprintf(str_buff, sizeof(str_buff), "%04ums", xtime_get_tick_ms());
         break;
 
     case XLOG_TIME_MOD_RELATIVE:
@@ -195,13 +195,13 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
         break;
 
     default:
-        snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
+        snprintf(str_buff, sizeof(str_buff), "%04ums", xtime_get_tick_ms());
         break;
     }
 
     if (ret != XHAL_OK)
     {
-        snprintf(str_buff, sizeof(str_buff), "%04llums", xtime_get_tick_ms());
+        snprintf(str_buff, sizeof(str_buff), "%04ums", xtime_get_tick_ms());
     }
 
 #if XLOG_COLOR_ENABLE
