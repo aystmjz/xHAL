@@ -3,7 +3,7 @@
 #include "../xhal_trace.h"
 #include "cmb_cfg.h"
 #include <stdio.h>
-#include XHAL_CMSIS_DEVICE_HEADER
+#include XHAL_DEVICE_HEADER
 
 XLOG_TAG("xFaultTest");
 

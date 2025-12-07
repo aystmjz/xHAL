@@ -2,7 +2,7 @@
 #include "xhal_config.h"
 #include <stdarg.h>
 #include <stdio.h>
-#include XHAL_CMSIS_DEVICE_HEADER
+#include XHAL_DEVICE_HEADER
 
 void cmb_puts(const char *s)
 {

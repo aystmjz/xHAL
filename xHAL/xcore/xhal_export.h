@@ -51,7 +51,10 @@ typedef struct xhal_export
 } xhal_export_t;
 
 extern bool xhal_shutdown_req;
+
+#ifdef XHAL_OS_SUPPORTING
 extern osEventFlagsId_t xhal_poll_exit_event;
+#endif
 
 void xhal_run(void);
 void xhal_exit(void);

@@ -18,13 +18,13 @@
      ((xhal_pointer_t)(addr) <= XHAL_VALID_FLASH_END))
 
 #define XHAL_VERSION_MAJOR 2
-#define XHAL_VERSION_MINOR 0
-#define XHAL_VERSION_PATCH 4
+#define XHAL_VERSION_MINOR 1
+#define XHAL_VERSION_PATCH 1
 #define XHAL_VERSION_HEX                                      \
     ((XHAL_VERSION_MAJOR << 16) | (XHAL_VERSION_MINOR << 8) | \
      (XHAL_VERSION_PATCH))
 
-#define XHAL_VERSION_STR "2.0.4"
+#define XHAL_VERSION_STR "2.1.1"
 
 #define XHAL_BUILD_DATE  __DATE__
 #define XHAL_BUILD_TIME  __TIME__

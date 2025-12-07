@@ -5,6 +5,12 @@
 
 XLOG_TAG("xAssert");
 
+#ifdef XHAL_OS_SUPPORTING
+#include "../xos/xhal_os.h"
+#endif
+
+#define XASSERT_DISABLE_IRQ() __disable_irq()
+
 #ifndef XASSERT_USER_HOOK
 #define XASSERT_USER_HOOK (1)
 #endif
@@ -24,7 +30,7 @@ void _xassert_func(void)
     xassert_user_hook();
 #endif
 
-    __disable_irq();
+    XASSERT_DISABLE_IRQ();
 
     while (1)
     {
@@ -61,7 +67,7 @@ void _xassert(const char *condition, const char *extra, const char *tag,
                    condition, tag, file, line, func, id,
                    extra == NULL ? "<none>" : extra);
 
-    xtime_delay_ms(20); /* 确保串口输出完毕 */
+    xtime_delay_ms(50); /* 确保串口输出完毕 */
 
 #ifdef XHAL_OS_SUPPORTING
     osKernelLock();
