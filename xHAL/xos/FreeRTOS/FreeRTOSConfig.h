@@ -6,12 +6,12 @@
 #include "xhal_log.h"
 #include "xhal_malloc.h"
 #include "xhal_std.h"
-#include XHAL_CMSIS_DEVICE_HEADER
+#include XHAL_DEVICE_HEADER
 
 extern uint32_t SystemCoreClock;
 inline void *_xmalloc(uint32_t size);
 
-#define CMSIS_device_header XHAL_CMSIS_DEVICE_HEADER
+#define CMSIS_device_header XHAL_DEVICE_HEADER
 #define configASSERT(x)     xassert_tag(x, "xRTOS")
 #define pvPortMalloc        _xmalloc
 #define vPortFree           xfree
