@@ -99,6 +99,7 @@ void _wake_expired_sleepers(xcoro_manager_t *mgr)
         if (handle->waiting_event)
         {
             handle->waiting_event = NULL;
+            handle->wait_result   = XCORO_WAIT_TIMEOUT;
             handle->wait_mask     = 0;
             handle->wait_flags    = 0;
             _event_wait_list_find_remove(handle);
@@ -114,14 +115,18 @@ void _wake_expired_sleepers(xcoro_manager_t *mgr)
 
 xhal_tick_t _next_wakeup_delay_ms(xcoro_manager_t *mgr)
 {
-    if (!mgr->sleep_list)
+    if (mgr->sleep_list == NULL)
+    {
         return 0;
+    }
 
     xhal_tick_t now  = xtime_get_tick_ms();
     xhal_tick_t tick = mgr->sleep_list->wakeup_tick_ms;
 
     if (TIME_AFTER_EQ(now, tick))
+    {
         return 1;
+    }
 
     return TIME_DIFF(tick, now);
 }
@@ -153,9 +158,9 @@ xhal_err_t xcoro_register(xcoro_manager_t *mgr, xcoro_handle_t *handle)
     void *save_user_data       = handle->user_data;
 
     xmemset(handle, 0, sizeof(*handle));
-    
+
     handle->prio      = save_prio;
-    handle->entry      = save_entry;
+    handle->entry     = save_entry;
     handle->user_data = save_user_data;
     handle->mgr       = mgr;
 
@@ -198,6 +203,7 @@ xhal_err_t xcoro_unregister(xcoro_handle_t *handle)
     if (handle->waiting_event)
     {
         handle->waiting_event = NULL;
+        handle->wait_result   = XCORO_WAIT_CANCELED;
         handle->wait_mask     = 0;
         handle->wait_flags    = 0;
         _event_wait_list_find_remove(handle);
@@ -255,11 +261,9 @@ void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
 {
     event->flag |= bits;
 
-    /* 取出整个 wait_list */
     xcoro_handle_t *handle = event->wait_list;
     event->wait_list       = NULL;
 
-    /* 未满足条件的重新挂回 event->wait_list */
     xcoro_handle_t *remain_list = NULL;
 
     while (handle)
@@ -285,7 +289,6 @@ void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
 
         if (satisfied)
         {
-            /* 如果存在 timeout，则从 sleep_list 移除 */
             if (handle->wakeup_tick_ms)
             {
                 handle->wakeup_tick_ms = 0;
@@ -299,6 +302,7 @@ void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
             }
 
             handle->waiting_event = NULL;
+            handle->wait_result   = XCORO_WAIT_OK;
 
             handle->state = XCORO_STATE_READY;
             _ready_list_insert(handle);
@@ -339,6 +343,7 @@ void xcoro_schedule(xcoro_handle_t *handle)
     if (handle->waiting_event)
     {
         handle->waiting_event = NULL;
+        handle->wait_result   = XCORO_WAIT_CANCELED;
         handle->wait_mask     = 0;
         handle->wait_flags    = 0;
         _event_wait_list_find_remove(handle);
@@ -378,6 +383,7 @@ void xcoro_finish(xcoro_handle_t *handle)
     if (handle->waiting_event)
     {
         handle->waiting_event = NULL;
+        handle->wait_result   = XCORO_WAIT_CANCELED;
         handle->wait_mask     = 0;
         handle->wait_flags    = 0;
         _event_wait_list_find_remove(handle);
@@ -386,21 +392,23 @@ void xcoro_finish(xcoro_handle_t *handle)
     handle->state = XCORO_STATE_FINISHED;
 }
 
-/* 请求 shutdown */
 void xcoro_request_shutdown(xcoro_manager_t *mgr)
 {
     mgr->shutdown_req = true;
 }
 
-/* 主调度循环（tickless） */
 void xcoro_scheduler_run(xcoro_manager_t *mgr)
 {
     while (!mgr->shutdown_req)
     {
-        /* 唤醒延时到期 */
+        /* ------------------------------------------------------------
+         * 1. 处理所有已到期的延时协程（sleep_list → ready_list）
+         * ------------------------------------------------------------ */
         _wake_expired_sleepers(mgr);
 
-        /* 有 READY 协程直接运行 */
+        /* ------------------------------------------------------------
+         * 2. 若有 READY 协程，则立即运行调度
+         * ------------------------------------------------------------ */
         xcoro_handle_t *handle = _get_next_ready(mgr);
         if (handle)
         {
@@ -411,19 +419,42 @@ void xcoro_scheduler_run(xcoro_manager_t *mgr)
             continue;
         }
 
-        /* 无 READY → tickless 进入低功耗 */
+        /* ------------------------------------------------------------
+         * 3. 若无 READY 协程 → 准备进入“tickless 低功耗”
+         *    计算下一次需要唤醒的时间点（下一协程超时）
+         * ------------------------------------------------------------ */
         xhal_tick_t delay = _next_wakeup_delay_ms(mgr);
 
         if (delay == 0)
         {
-            /* 无限等待事件 */
-            // xcoro_enter_lowpower();
+            /* --------------------------------------------------------
+             * 3.1 没有任何未来的超时事件（sleep_list 为空）
+             *     → 协程系统完全事件驱动
+             *
+             *     行为：
+             *       - 不配置定时唤醒
+             *       - CPU 可立即进入 WFI/WFE 等待外设/中断事件
+             *       - 外部事件触发后重新进入调度循环
+             * -------------------------------------------------------- */
+
+            /* 进入低功耗等待（WFI/WFE），直到事件中断唤醒 */
             continue;
         }
 
-        // /* 有限等待：sleep 到下一次超时 */
-        // xcoro_timer_start_oneshot(delay);
-        // xcoro_enter_lowpower();
-        // xcoro_timer_stop();
+        /* ------------------------------------------------------------
+         * 3.2 存在未来的唤醒时间点（sleep_list 非空）
+         *     → 安排一次定时唤醒以进入下一个协程节点
+         *
+         *     要做的事：
+         *       (1) 配置低功耗定时器，delay 毫秒后触发中断
+         *       (2) 执行 WFI/WFE 进入低功耗
+         *       (3) 自动在中断后恢复 tick 计数（必要时校准）
+         * ------------------------------------------------------------ */
+
+        /* 3.2.1 配置低功耗定时器，使其在 delay ms 后触发唤醒中断 */
+
+        /* 3.2.2 进入 WFI/WFE，CPU 进入低功耗睡眠 */
+
+        /* 3.2.3 中断返回后，若系统使用 tickless，需要在此校准系统 tick */
     }
 }

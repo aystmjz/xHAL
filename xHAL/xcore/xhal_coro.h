@@ -33,6 +33,13 @@ typedef enum
     XCORO_STATE_FINISHED   /* 已结束 */
 } xcoro_state_t;
 
+typedef enum
+{
+    XCORO_WAIT_OK = 0,
+    XCORO_WAIT_TIMEOUT,
+    XCORO_WAIT_CANCELED
+} xcoro_wait_result_t;
+
 /* 优先级 */
 typedef enum
 {
@@ -64,6 +71,7 @@ typedef struct xcoro_handle
     xhal_tick_t wakeup_tick_ms;
 
     xcoro_event_t *waiting_event;
+    xcoro_wait_result_t wait_result;
     uint32_t wait_mask;
     uint32_t wait_flags;
 
@@ -138,6 +146,8 @@ typedef struct xcoro_manager
     } while (0)
 
 #define XCORO_USER_DATA(handle, type) ((type *)((handle)->user_data))
+
+#define XCORO_WAIT_RESULT(handle) ((handle)->wait_result)
 
 void _wake_expired_sleepers(xcoro_manager_t *mgr);
 xhal_tick_t _next_wakeup_delay_ms(xcoro_manager_t *mgr);
