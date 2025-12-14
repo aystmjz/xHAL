@@ -3,8 +3,95 @@
 #include "xhal_log.h"
 #include "xhal_malloc.h"
 #include "xhal_time.h"
+#include <string.h>
 
 XLOG_TAG("xCoro");
+
+#ifndef XCORO_EVENT_NUM_MAX
+#define XCORO_EVENT_NUM_MAX (64)
+#endif
+
+static xcoro_event_t *xcoro_event_table[XCORO_EVENT_NUM_MAX];
+static uint16_t xcoro_event_count = 0;
+
+xhal_err_t xcoro_event_add(xcoro_event_t *event)
+{
+    xassert_not_null(event);
+    xassert_not_null(event->name);
+    xassert_name(xcoro_event_find(event->name) == NULL, event->name);
+
+    for (uint16_t i = 0; i < XCORO_EVENT_NUM_MAX; i++)
+    {
+        if (xcoro_event_table[i] == NULL)
+        {
+            xcoro_event_table[i] = event;
+            xcoro_event_count++;
+            return XHAL_OK;
+        }
+    }
+
+    return XHAL_ERR_NO_MEMORY;
+}
+
+xhal_err_t xcoro_event_remove(xcoro_event_t *event)
+{
+    xassert_not_null(event);
+
+    xhal_err_t ret = XHAL_ERROR;
+
+    for (uint16_t i = 0; i < XCORO_EVENT_NUM_MAX; i++)
+    {
+        if (xcoro_event_table[i] == event)
+        {
+            xcoro_event_table[i] = NULL;
+            xcoro_event_count--;
+            ret = XHAL_OK;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+xcoro_event_t *xcoro_event_find(const char *name)
+{
+    xassert_not_null(name);
+
+    xcoro_event_t *event = NULL;
+    for (uint16_t i = 0; i < XCORO_EVENT_NUM_MAX; i++)
+    {
+        if (xcoro_event_table[i] ? xcoro_event_table[i]->name == NULL : NULL)
+        {
+            continue;
+        }
+
+        if (strcmp(xcoro_event_table[i]->name, name) == 0)
+        {
+            event = xcoro_event_table[i];
+            break;
+        }
+    }
+
+    return event;
+}
+
+bool xcoro_event_valid(const char *name)
+{
+    return xcoro_event_find(name) == NULL ? false : true;
+}
+
+bool xcoro_event_of_name(xcoro_event_t *event, const char *name)
+{
+    xassert_not_null(event);
+    xassert_not_null(name);
+
+    if (event->name ? strcmp(event->name, name) == 0 : NULL)
+    {
+        return true;
+    }
+
+    return false;
+}
 
 static void _ready_list_insert(xcoro_handle_t *handle)
 {
@@ -98,11 +185,11 @@ void _wake_expired_sleepers(xcoro_manager_t *mgr)
 
         if (handle->waiting_event)
         {
+            _event_wait_list_find_remove(handle);
             handle->waiting_event = NULL;
-            handle->wait_result   = XCORO_WAIT_TIMEOUT;
+            handle->wait_result   = (uint32_t)XCORO_WAIT_TIMEOUT;
             handle->wait_mask     = 0;
             handle->wait_flags    = 0;
-            _event_wait_list_find_remove(handle);
         }
 
         handle->next           = NULL;
@@ -202,11 +289,11 @@ xhal_err_t xcoro_unregister(xcoro_handle_t *handle)
 
     if (handle->waiting_event)
     {
+        _event_wait_list_find_remove(handle);
         handle->waiting_event = NULL;
-        handle->wait_result   = XCORO_WAIT_CANCELED;
+        handle->wait_result   = (uint32_t)XCORO_WAIT_CANCELED;
         handle->wait_mask     = 0;
         handle->wait_flags    = 0;
-        _event_wait_list_find_remove(handle);
     }
 
     handle->mgr->count--;
@@ -239,17 +326,39 @@ void xcoro_wait_event(xcoro_handle_t *handle, xcoro_event_t *event,
 {
     xassert_not_null(handle);
     xassert_not_null(event);
+    xassert(mask != 0);
+
+    uint32_t matched = event->flags & mask;
+
+    if ((flags & XCORO_FLAGS_WAIT_ALL) ? (matched == mask) : (matched != 0))
+    {
+        /* Auto-clear（默认） */
+        if ((flags & XCORO_FLAGS_WAIT_NO_CLEAR) == 0)
+        {
+            event->flags &=
+                (flags & XCORO_FLAGS_WAIT_ALL) ? (~mask) : (~matched);
+        }
+
+        handle->wait_result   = matched;
+        handle->waiting_event = NULL;
+        handle->wait_mask     = 0;
+        handle->wait_flags    = 0;
+
+        handle->state = XCORO_STATE_READY;
+        _ready_list_insert(handle);
+        return;
+    }
 
     handle->state         = XCORO_STATE_WAITING;
     handle->waiting_event = event;
     handle->wait_mask     = mask;
     handle->wait_flags    = flags;
 
-    /* 加入 event wait_list */
+    /* 挂入 event wait_list */
     handle->next     = event->wait_list;
     event->wait_list = handle;
 
-    /* 如有超时，则还要加入 sleep_list */
+    /* 有超时则加入 sleep_list */
     if (timeout_ms != XCORO_WAIT_FOREVER)
     {
         handle->wakeup_tick_ms = xtime_get_tick_ms() + timeout_ms;
@@ -259,7 +368,7 @@ void xcoro_wait_event(xcoro_handle_t *handle, xcoro_event_t *event,
 
 void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
 {
-    event->flag |= bits;
+    event->flags |= bits;
 
     xcoro_handle_t *handle = event->wait_list;
     event->wait_list       = NULL;
@@ -271,38 +380,28 @@ void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
         xcoro_handle_t *next = handle->next;
         handle->next         = NULL;
 
-        uint8_t wait_all = (handle->wait_flags & XCORO_FLAGS_WAIT_ALL) != 0;
+        uint32_t matched = event->flags & handle->wait_mask;
 
-        uint8_t satisfied;
+        if ((handle->wait_flags & XCORO_FLAGS_WAIT_ALL)
+                ? (matched == handle->wait_mask)
+                : (matched != 0))
+        {
+            /* Auto-clear（默认） */
+            if ((handle->wait_flags & XCORO_FLAGS_WAIT_NO_CLEAR) == 0)
+            {
+                event->flags &= (handle->wait_flags & XCORO_FLAGS_WAIT_ALL)
+                                    ? (~handle->wait_mask)
+                                    : (~matched);
+            }
 
-        if (wait_all)
-        {
-            /* ALL: 所有 mask 位都满足 */
-            satisfied =
-                ((event->flag & handle->wait_mask) == handle->wait_mask);
-        }
-        else
-        {
-            /* ANY: 只要一个位满足即可 */
-            satisfied = ((event->flag & handle->wait_mask) != 0);
-        }
-
-        if (satisfied)
-        {
             if (handle->wakeup_tick_ms)
             {
                 handle->wakeup_tick_ms = 0;
                 _sleep_list_find_remove(handle);
             }
 
-            /* 默认 auto-clear（除非设置 NO_CLEAR） */
-            if ((handle->wait_flags & XCORO_FLAGS_WAIT_NO_CLEAR) == 0)
-            {
-                event->flag &= ~handle->wait_mask;
-            }
-
             handle->waiting_event = NULL;
-            handle->wait_result   = XCORO_WAIT_OK;
+            handle->wait_result   = matched;
 
             handle->state = XCORO_STATE_READY;
             _ready_list_insert(handle);
@@ -342,11 +441,11 @@ void xcoro_schedule(xcoro_handle_t *handle)
 
     if (handle->waiting_event)
     {
+        _event_wait_list_find_remove(handle);
         handle->waiting_event = NULL;
-        handle->wait_result   = XCORO_WAIT_CANCELED;
+        handle->wait_result   = (uint32_t)XCORO_WAIT_CANCELED;
         handle->wait_mask     = 0;
         handle->wait_flags    = 0;
-        _event_wait_list_find_remove(handle);
     }
 
     handle->state = XCORO_STATE_READY;
@@ -382,11 +481,11 @@ void xcoro_finish(xcoro_handle_t *handle)
 
     if (handle->waiting_event)
     {
+        _event_wait_list_find_remove(handle);
         handle->waiting_event = NULL;
-        handle->wait_result   = XCORO_WAIT_CANCELED;
+        handle->wait_result   = (uint32_t)XCORO_WAIT_CANCELED;
         handle->wait_mask     = 0;
         handle->wait_flags    = 0;
-        _event_wait_list_find_remove(handle);
     }
 
     handle->state = XCORO_STATE_FINISHED;
