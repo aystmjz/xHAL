@@ -6,9 +6,9 @@
 #include "xhal_std.h"
 #include <time.h>
 
-#define TIME_AFTER(a, b)          ((int64_t)((b) - (a)) < 0)
+#define TIME_AFTER(a, b)          ((int32_t)((b) - (a)) < 0)
 #define TIME_BEFOR(a, b)          TIME_AFTER(b, a)
-#define TIME_AFTER_EQ(a, b)       ((int64_t)((a) - (b)) >= 0)
+#define TIME_AFTER_EQ(a, b)       ((int32_t)((a) - (b)) >= 0)
 #define TIME_BEFOR_EQ(a, b)       TIME_AFTER_EQ(b, a)
 #define TIME_DIFF(later, earlier) ((xhal_tick_t)((later) - (earlier)))
 
