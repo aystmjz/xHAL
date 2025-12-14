@@ -44,6 +44,7 @@ void _xassert(const char *condition, const char *extra, const char *tag,
         return;
 
     if (id == XASSERT_INVALID_ID)
+    {
         XLOG_ERROR("\r\n\r\n==============================\r\n"
                    " Assert failure!\r\n"
                    " Condition| %s\r\n"
@@ -54,7 +55,9 @@ void _xassert(const char *condition, const char *extra, const char *tag,
                    "==============================",
                    condition, tag, file, line, func,
                    extra == NULL ? "<none>" : extra);
+    }
     else
+    {
         XLOG_ERROR("\r\n\r\n==============================\r\n"
                    " Assert failure!\r\n"
                    " Condition| %s\r\n"
@@ -66,8 +69,9 @@ void _xassert(const char *condition, const char *extra, const char *tag,
                    "==============================",
                    condition, tag, file, line, func, id,
                    extra == NULL ? "<none>" : extra);
+    }
 
-    xtime_delay_ms(50); /* 确保串口输出完毕 */
+    xtime_delay_ms(100); /* 确保串口输出完毕 */
 
 #ifdef XHAL_OS_SUPPORTING
     osKernelLock();

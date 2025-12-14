@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define XLOG_BUFF_SIZE (256) /* 日志缓冲区大小 */
+#define XLOG_BUFF_SIZE (512) /* 日志缓冲区大小 */
 
 #ifndef XLOG_DEFAULT_LEVEL
 #define XLOG_DEFAULT_LEVEL (XLOG_LEVEL_DEBUG)
