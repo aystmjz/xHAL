@@ -60,8 +60,8 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr);
 xhal_err_t xperiph_unregister(xhal_periph_t *self);
 uint16_t xperiph_get_number(void);
 xhal_periph_t *xperiph_find(const char *name);
-uint8_t xperiph_valid(const char *name);
-uint8_t xperiph_of_name(xhal_periph_t *self, const char *name);
+bool xperiph_valid(const char *name);
+bool xperiph_of_name(xhal_periph_t *self, const char *name);
 
 #ifdef XHAL_OS_SUPPORTING
 void xperiph_mutex_control(xhal_periph_t *self, uint8_t status);

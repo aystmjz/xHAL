@@ -41,33 +41,39 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
 #ifdef XHAL_OS_SUPPORTING
     osStatus_t ret_os = osOK;
     osMutexId_t mutex = _xperiph_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
+    ret_os = osMutexAcquire(mutex, osWaitForever);
     xassert(ret_os == osOK);
 
     self->mutex = osMutexNew(&xperiph_mutex_attr);
     xassert_not_null(self->mutex);
 #endif
+
     self->attr      = *attr;
     self->is_inited = XPERIPH_NOT_INITED;
 
-    xassert_name(xperiph_count < XHAL_PERI_NUM_MAX, attr->name);
-
-    if (xperiph_count >= XHAL_PERI_NUM_MAX)
+    uint8_t inserted = 0;
+    for (uint16_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
     {
-        ret = XHAL_ERR_NO_MEMORY;
-        goto exit;
-    }
-
-    if (xperiph_count == 0)
-    {
-        for (uint16_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
+        if (xperiph_table[i] == NULL)
         {
-            xperiph_table[i] = NULL;
+            xperiph_table[i] = self;
+            xperiph_count++;
+            inserted = 1;
+            break;
         }
     }
-    xperiph_table[xperiph_count++] = self;
 
-exit:
+    if (!inserted)
+    {
+        ret = XHAL_ERR_NO_MEMORY;
+
+#ifdef XHAL_OS_SUPPORTING
+        ret_os = osMutexDelete(self->mutex);
+        xassert(ret_os == osOK);
+        self->mutex = NULL;
+#endif
+    }
+
 #ifdef XHAL_OS_SUPPORTING
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
@@ -156,13 +162,10 @@ xhal_periph_t *xperiph_find(const char *name)
     xhal_periph_t *self = NULL;
     for (uint32_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
     {
-        if (xperiph_table[i] == NULL)
+        if (xperiph_table[i] ? xperiph_table[i]->attr.name == NULL : NULL)
         {
-            break;
+            continue;
         }
-
-        xassert_name(xperiph_table[0]->attr.name != NULL,
-                     "Device table corrupted");
 
         if (strcmp(xperiph_table[i]->attr.name, name) == 0)
         {
@@ -183,7 +186,7 @@ xhal_periph_t *xperiph_find(const char *name)
  * @param name    设备名称
  * @return 有效返回真，无效返回假
  */
-uint8_t xperiph_valid(const char *name)
+bool xperiph_valid(const char *name)
 {
     return xperiph_find(name) == NULL ? false : true;
 }
@@ -194,18 +197,21 @@ uint8_t xperiph_valid(const char *name)
  * @param name    设备名称
  * @return 真或假
  */
-uint8_t xperiph_of_name(xhal_periph_t *self, const char *name)
+bool xperiph_of_name(xhal_periph_t *self, const char *name)
 {
-    uint8_t of_the_name = false;
+    xassert_not_null(self);
+    xassert_not_null(name);
+
+    bool ret = false;
 
     xperiph_lock(self);
-    if (strcmp(self->attr.name, name) == 0)
+    if (self->attr.name ? strcmp(self->attr.name, name) == 0 : NULL)
     {
-        of_the_name = true;
+        ret = true;
     }
     xperiph_unlock(self);
 
-    return of_the_name;
+    return ret;
 }
 
 #ifdef XHAL_OS_SUPPORTING
