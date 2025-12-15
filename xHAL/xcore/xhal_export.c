@@ -54,11 +54,12 @@ static void _poll_thread(void *arg);
 #endif
 
 static void _get_poll_export_table(void);
+static void _get_coro_export_table(xcoro_manager_t *mgr);
 static void _get_init_export_table(void);
 static void _get_exit_export_table(void);
 
 static void _export_init_func(int16_t level);
-static void _export_poll_func(void);
+static void _export_poll_coro_func(void);
 
 static void null_poll(void)
 {
@@ -67,6 +68,12 @@ static void null_poll(void)
 #endif
 }
 POLL_EXPORT(null_poll, (60 * 1000));
+static void null_coro(xcoro_handle_t *handle)
+{
+    /* do nothing */
+}
+CORO_EXPORT(null_coro, XCORO_PRIO_NORMAL);
+
 static void null_init(void)
 {
     /* do nothing */
@@ -78,11 +85,15 @@ static void null_exit(void)
 }
 EXIT_EXPORT(null_exit, EXPORT_LEVEL_NULL);
 
+static xcoro_manager_t xexport_coro_manager;
+
 static const xhal_export_t *xexport_poll_table = NULL; /* 轮询导出表 */
+static const xhal_export_t *xexport_coro_table = NULL; /* 协程导出表 */
 static const xhal_export_t *xexport_init_table = NULL; /* 初始化导出表 */
 static const xhal_export_t *xexport_exit_table = NULL; /* 退出导出表 */
 
 static uint32_t xexport_poll_count    = 0; /* 轮询导出函数计数 */
+static uint32_t xexport_coro_count    = 0; /* 协程导出函数计数 */
 static uint32_t xexport_init_count    = 0; /* 初始化导出函数计数 */
 static uint32_t xexport_exit_count    = 0; /* 退出导出函数计数 */
 static int16_t xexport_init_level_max = 0; /* 最大初始化导出级别 */
@@ -101,6 +112,7 @@ void xhal_run(void)
     _get_poll_export_table();
     _get_init_export_table();
     _get_exit_export_table();
+    _get_coro_export_table(&xexport_coro_manager);
 
 #ifdef XHAL_OS_SUPPORTING
 
@@ -132,7 +144,7 @@ void xhal_run(void)
         _export_init_func(level);
     }
 
-    _export_poll_func();
+    _export_poll_coro_func();
 #endif /* XHAL_UNIT_TEST */
 
 #endif /* XHAL_OS_SUPPORTING */
@@ -369,7 +381,7 @@ static void _get_poll_export_table(void)
             xhal_export_poll_data_t *data =
                 (xhal_export_poll_data_t *)xexport_poll_table[i].data;
             /* 设置超时时间 */
-            data->timeout_ms =
+            data->wakeup_tick_ms =
                 xtime_get_tick_ms() + xexport_poll_table[i].period_ms;
             i++;
         }
@@ -381,6 +393,49 @@ static void _get_poll_export_table(void)
     xexport_poll_count = i; /* 设置轮询导出函数计数 */
 
     XLOG_DEBUG("Export poll table: %d", xexport_poll_count);
+}
+
+static void _get_coro_export_table(xcoro_manager_t *mgr)
+{
+    xhal_export_t *func_block = ((xhal_export_t *)&coro_null_coro);
+    xhal_pointer_t address_last;
+
+    xcoro_manager_init(mgr);
+
+    while (1)
+    {
+        address_last = ((xhal_pointer_t)func_block - sizeof(xhal_export_t));
+        xhal_export_t *table = (xhal_export_t *)address_last;
+        if (table->magic_head != EXPORT_ID_CORO ||
+            table->magic_tail != EXPORT_ID_CORO)
+        {
+            break; /* 如果不是有效的协程导出项，则退出循环 */
+        }
+        func_block = table;
+    }
+    xexport_coro_table = func_block; /* 设置协程导出表起始地址 */
+
+    uint32_t i = 0;
+    while (1)
+    {
+        if (xexport_coro_table[i].magic_head == EXPORT_ID_CORO &&
+            xexport_coro_table[i].magic_tail == EXPORT_ID_CORO)
+        {
+            xhal_export_coro_data_t *data =
+                (xhal_export_coro_data_t *)xexport_coro_table[i].data;
+
+            data->handle.entry = (xcoro_entry_t)xexport_coro_table[i].func;
+            xcoro_register(mgr, &data->handle);
+            i++;
+        }
+        else
+        {
+            break; /* 如果不是有效的协程导出项，则退出循环 */
+        }
+    }
+    xexport_coro_count = i; /* 设置协程导出函数计数 */
+
+    XLOG_DEBUG("Export coro table: %d", xexport_coro_count);
 }
 
 static void _export_init_func(int16_t level)
@@ -421,7 +476,7 @@ static void _entry_start_export(void *para)
     XLOG_INFO("Init thread ended, Memory usage: %d.%d%%, Free size: %lu bytes",
               perused / 10, perused % 10, free_size);
 
-    _export_poll_func();
+    _export_poll_coro_func();
 
     perused   = xmem_perused();
     free_size = xmem_free_size();
@@ -466,7 +521,6 @@ static void _poll_thread(void *arg)
 
         if (exec_ticks > period_ticks)
         {
-
             XLOG_WARN("Poll task '%s' execution overrun: %lu > %lu ticks",
                       export->name, exec_ticks, period_ticks);
         }
@@ -502,7 +556,7 @@ static void _poll_thread(void *arg)
     osThreadExit();
 }
 
-static void _export_poll_func(void)
+static void _export_poll_coro_func(void)
 {
     xhal_poll_exit_event = osEventFlagsNew(&xexport_poll_wake_flag_attr);
     xassert_not_null(xhal_poll_exit_event);
@@ -578,9 +632,10 @@ static void _export_poll_func(void)
 }
 #else
 
-static void _export_poll_func(void)
+static void _export_poll_coro_func(void)
 {
     xhal_export_poll_data_t *data;
+    xcoro_manager_t *mgr = &xexport_coro_manager;
 
     while (1)
     {
@@ -588,24 +643,34 @@ static void _export_poll_func(void)
         {
             data = xexport_poll_table[i].data;
 
-            uint64_t time = xtime_get_tick_ms();
+            xhal_tick_t start = xtime_get_tick_ms();
 
-            if (time >= data->timeout_ms)
+            if (TIME_BEFOR(data->wakeup_tick_ms, start))
             {
-                /* 更新超时时间 */
-                data->timeout_ms = time + xexport_poll_table[i].period_ms;
-
                 ((void (*)(void))xexport_poll_table[i].func)();
 
-                uint64_t after_time = xtime_get_tick_ms();
+                xhal_tick_t end = xtime_get_tick_ms();
 
-                if (after_time >= data->timeout_ms)
+                data->wakeup_tick_ms = start + xexport_poll_table[i].period_ms;
+
+                if (TIME_BEFOR(data->wakeup_tick_ms, end))
                 {
+                    data->wakeup_tick_ms = end;
                     XLOG_WARN("Poll function %s execution time exceeds period",
                               xexport_poll_table[i].name);
                 }
-            } /* if (time >= data->timeout_ms) */
+            } /* if (TIME_BEFOR(data->wakeup_tick_ms, start)) */
         } /* for (uint32_t i = 0; i < xexport_poll_count; i++) */
+
+        /* 唤醒延时到期 */
+        _wake_expired_sleepers(mgr);
+
+        /* 有 READY 协程直接运行 */
+        xcoro_handle_t *handle = _get_next_ready(mgr);
+        if (handle ? handle->entry : NULL)
+        {
+            handle->entry(handle);
+        }
     } /* while (1) */
 }
 

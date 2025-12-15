@@ -3,19 +3,21 @@
 
 #include "../xos/xhal_os.h"
 #include "xhal_config.h"
+#include "xhal_coro.h"
 #include "xhal_def.h"
 #include "xhal_std.h"
 
 #define EXPORT_ID_INIT (0xabababab)
 #define EXPORT_ID_EXIT (0xcdcdcdcd)
 #define EXPORT_ID_POLL (0xefefefef)
+#define EXPORT_ID_CORO (0xafafafaf)
 
 typedef enum xport_level
 {
-    EXPORT_LEVEL_NULL    = -3,
-    EXPORT_LEVEL_TEST    = -2,
-    EXPORT_LEVEL_POLL    = -1,
-    
+    EXPORT_LEVEL_NULL = -3,
+    EXPORT_LEVEL_TEST = -2,
+    EXPORT_LEVEL_POLL = -1,
+
     EXPORT_LEVEL_DEBUG   = 0,
     EXPORT_LEVEL_CORE    = 1,
     EXPORT_LEVEL_PERIPH  = 2,
@@ -30,8 +32,13 @@ typedef enum xport_level
 /* 轮询导出数据结构 */
 typedef struct xhal_export_poll_data
 {
-    uint64_t timeout_ms;
+    uint32_t wakeup_tick_ms;
 } xhal_export_poll_data_t;
+
+typedef struct xhal_export_coro_data
+{
+    xcoro_handle_t handle;
+} xhal_export_coro_data_t;
 
 /* 导出项结构体 */
 typedef struct xhal_export
@@ -40,7 +47,7 @@ typedef struct xhal_export
     const char *name;    /* 导出函数名称 */
     void *func;          /* 导出函数 */
     void *data;          /* 导出函数数据 */
-    uint16_t type;        /* 导出类型（保留字段） */
+    uint16_t type;       /* 导出类型（保留字段） */
     int16_t level;       /* 导出级别 */
     uint32_t period_ms;  /* 轮询周期 */
 #ifdef XHAL_OS_SUPPORTING
@@ -50,9 +57,8 @@ typedef struct xhal_export
     uint32_t magic_tail; /* 尾部魔数 */
 } xhal_export_t;
 
-extern bool xhal_shutdown_req;
-
 #ifdef XHAL_OS_SUPPORTING
+extern bool xhal_shutdown_req;
 extern osEventFlagsId_t xhal_poll_exit_event;
 #endif
 
@@ -110,7 +116,7 @@ void xhal_exit(void);
  */
 #define POLL_EXPORT(_func, _period_ms)                       \
     static xhal_export_poll_data_t poll_##_func##_data = {   \
-        .timeout_ms = 0,                                     \
+        .wakeup_tick_ms = 0,                                 \
     };                                                       \
     XHAL_USED const xhal_export_t poll_##_func XHAL_SECTION( \
         ".xhal_poll_export") = {                             \
@@ -123,10 +129,24 @@ void xhal_exit(void);
         .magic_tail = EXPORT_ID_POLL,                        \
     }
 
+#define CORO_EXPORT(_func, _priority)                        \
+    static xhal_export_coro_data_t coro_##_func##_data = {   \
+        .handle = {.prio = _priority},                       \
+    };                                                       \
+    XHAL_USED const xhal_export_t coro_##_func XHAL_SECTION( \
+        ".xhal_coro_export") = {                             \
+        .name       = #_func,                                \
+        .func       = (void *)&_func,                        \
+        .data       = (void *)&coro_##_func##_data,          \
+        .level      = (int16_t)(EXPORT_LEVEL_POLL),          \
+        .magic_head = EXPORT_ID_CORO,                        \
+        .magic_tail = EXPORT_ID_CORO,                        \
+    }
+
 #ifdef XHAL_OS_SUPPORTING
 #define POLL_EXPORT_OS(_func, _period_ms, _priority, _stack_size) \
     static xhal_export_poll_data_t poll_##_func##_data = {        \
-        .timeout_ms = 0,                                          \
+        .wakeup_tick_ms = 0,                                      \
     };                                                            \
     XHAL_USED const xhal_export_t poll_##_func XHAL_SECTION(      \
         ".xhal_poll_export") = {                                  \
