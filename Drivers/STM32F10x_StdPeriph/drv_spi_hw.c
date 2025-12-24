@@ -1,4 +1,5 @@
 #include "drv_util.h"
+#include "xhal_bit.h"
 #include "xhal_spi.h"
 #include <ctype.h>
 #include <string.h>
@@ -301,6 +302,8 @@ void SPI1_IRQHandler(void)
             SPI_Cmd(info->spi, DISABLE);
 #ifdef XHAL_OS_SUPPORTING
             osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_RX_DONE);
+#else
+            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_RX_DONE);
 #endif
         }
     }
@@ -325,6 +328,8 @@ void SPI1_IRQHandler(void)
             SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
 #ifdef XHAL_OS_SUPPORTING
             osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#else
+            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
 #endif
         }
     }
@@ -354,6 +359,8 @@ void SPI2_IRQHandler(void)
             SPI_Cmd(info->spi, DISABLE);
 #ifdef XHAL_OS_SUPPORTING
             osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_RX_DONE);
+#else
+            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_RX_DONE);
 #endif
         }
     }
@@ -378,6 +385,8 @@ void SPI2_IRQHandler(void)
             SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
 #ifdef XHAL_OS_SUPPORTING
             osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#else
+            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
 #endif
         }
     }
