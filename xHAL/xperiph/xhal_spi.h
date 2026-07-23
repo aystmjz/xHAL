@@ -65,6 +65,8 @@ typedef struct xhal_spi_data
 
 #ifdef XHAL_OS_SUPPORTING
     osEventFlagsId_t event_flag;
+#else
+    volatile uint32_t event_flag;
 #endif
     const char *spi_name;
 

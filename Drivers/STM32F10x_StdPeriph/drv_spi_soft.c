@@ -13,7 +13,7 @@ XLOG_TAG("xDriverSPIsoft");
 #define MOSI_L(port, pin)    GPIO_ResetBits(port, pin)
 #define MISO_READ(port, pin) GPIO_ReadInputDataBit(port, pin)
 
-#define SPI_DELAY()                            \
+#define SPI_DELAY()                           \
     for (volatile uint16_t d = 0; d < 1; d++) \
     __NOP()
 

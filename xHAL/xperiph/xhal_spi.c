@@ -2,6 +2,7 @@
 #include "../xcore/xhal_assert.h"
 #include "../xcore/xhal_log.h"
 #include "../xcore/xhal_time.h"
+#include "../xlib/xhal_bit.h"
 #include "xhal_pin.h"
 
 XLOG_TAG("xSPI");
@@ -64,6 +65,8 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
 #ifdef XHAL_OS_SUPPORTING
     spi->data.event_flag = osEventFlagsNew(&xspi_event_flag_attr);
     xassert_not_null(spi->data.event_flag);
+#else
+    spi->data.event_flag = 0;
 #endif
     ret = spi->ops->init(spi);
     if (ret != XHAL_OK)
@@ -97,6 +100,23 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
 
     xperiph_lock(self);
 
+    uint32_t wait_flags = 0;
+    switch (spi->data.config.direction)
+    {
+    case XSPI_DIR_2LINE_FULL_DUPLEX:
+        wait_flags = XSPI_EVENT_DONE;
+        break;
+    case XSPI_DIR_2LINE_RX_ONLY:
+    case XSPI_DIR_1LINE_RX:
+        wait_flags = XSPI_EVENT_RX_DONE;
+        break;
+    case XSPI_DIR_1LINE_TX:
+        wait_flags = XSPI_EVENT_TX_DONE;
+        break;
+    default:
+        break;
+    }
+
     for (uint32_t i = 0; i < num; i++)
     {
         if ((msgs[i].tx_buf == NULL && msgs[i].rx_buf == NULL) ||
@@ -122,38 +142,20 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
 
     for (uint32_t i = 0; i < num; i++)
     {
+#ifdef XHAL_OS_SUPPORTING
+        osEventFlagsClear(spi->data.event_flag, wait_flags);
+#else
+        BITS_SET0(spi->data.event_flag, wait_flags);
+#endif
         ret = spi->ops->transfer(spi, &msgs[i]);
         if (ret != XHAL_OK)
         {
             goto exit;
         }
 
-        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
-        if (elapsed_ms >= timeout_ms)
-        {
-            ret = XHAL_ERR_TIMEOUT;
-            goto exit;
-        }
-
 #ifdef XHAL_OS_SUPPORTING
+        uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
         uint32_t wait_ms    = timeout_ms - elapsed_ms;
-        uint32_t wait_flags = 0;
-
-        switch (spi->data.config.direction)
-        {
-        case XSPI_DIR_2LINE_FULL_DUPLEX:
-            wait_flags = XSPI_EVENT_DONE;
-            break;
-        case XSPI_DIR_2LINE_RX_ONLY:
-        case XSPI_DIR_1LINE_RX:
-            wait_flags = XSPI_EVENT_RX_DONE;
-            break;
-        case XSPI_DIR_1LINE_TX:
-            wait_flags = XSPI_EVENT_TX_DONE;
-            break;
-        default:
-            break;
-        }
 
         osStatus_t ret_os = (osStatus_t)osEventFlagsWait(
             spi->data.event_flag, wait_flags, osFlagsWaitAll,
@@ -162,6 +164,16 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
         {
             ret = XHAL_ERR_TIMEOUT;
             goto exit;
+        }
+#else
+        while ((spi->data.event_flag & wait_flags) != wait_flags)
+        {
+            uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
+            if (elapsed_ms >= timeout_ms)
+            {
+                ret = XHAL_ERR_TIMEOUT;
+                goto exit;
+            }
         }
 #endif
     }

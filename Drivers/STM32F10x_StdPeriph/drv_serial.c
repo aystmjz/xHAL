@@ -241,7 +241,7 @@ static bool _check_uart_name_valid(const char *name)
     const char *valid_names[] = {"UART1",  "UART2",  "UART3",
                                  "USART1", "USART2", "USART3"};
 
-    for (size_t i = 0; i < sizeof(valid_names) / sizeof(valid_names[0]); i++)
+    for (uint16_t i = 0; i < sizeof(valid_names) / sizeof(valid_names[0]); i++)
     {
         if (_strcasecmp_upper(name, valid_names[i]))
         {

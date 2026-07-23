@@ -310,6 +310,17 @@ void SPI1_IRQHandler(void)
 
     if (SPI_I2S_GetITStatus(info->spi, SPI_I2S_IT_TXE) == SET)
     {
+        if (spi_ctx[id].tx_index >= spi_ctx[id].len)
+        {
+            SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
+#ifdef XHAL_OS_SUPPORTING
+            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#else
+            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#endif
+            return;
+        }
+
         uint16_t data_send = XSPI_DUMMY_BYTE;
         if (spi_ctx[id].tx_buf != NULL)
         {
@@ -323,15 +334,6 @@ void SPI1_IRQHandler(void)
         SPI_I2S_SendData(info->spi, data_send);
 
         spi_ctx[id].tx_index++;
-        if (spi_ctx[id].tx_index >= spi_ctx[id].len)
-        {
-            SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
-#ifdef XHAL_OS_SUPPORTING
-            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
-#else
-            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
-#endif
-        }
     }
 }
 
@@ -367,6 +369,17 @@ void SPI2_IRQHandler(void)
 
     if (SPI_I2S_GetITStatus(info->spi, SPI_I2S_IT_TXE) == SET)
     {
+        if (spi_ctx[id].tx_index >= spi_ctx[id].len)
+        {
+            SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
+#ifdef XHAL_OS_SUPPORTING
+            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#else
+            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
+#endif
+            return;
+        }
+
         uint16_t data_send = XSPI_DUMMY_BYTE;
         if (spi_ctx[id].tx_buf != NULL)
         {
@@ -380,14 +393,5 @@ void SPI2_IRQHandler(void)
         SPI_I2S_SendData(info->spi, data_send);
 
         spi_ctx[id].tx_index++;
-        if (spi_ctx[id].tx_index >= spi_ctx[id].len)
-        {
-            SPI_I2S_ITConfig(info->spi, SPI_I2S_IT_TXE, DISABLE);
-#ifdef XHAL_OS_SUPPORTING
-            osEventFlagsSet(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
-#else
-            BITS_SET1(spi_p[id]->data.event_flag, XSPI_EVENT_TX_DONE);
-#endif
-        }
     }
 }

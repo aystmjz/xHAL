@@ -220,10 +220,12 @@ static xhal_err_t _pwm_config(xhal_tim_t *self)
         if (pwm_config->channel_mask & (1U << i))
         {
             TIM_OCInitTypeDef TIM_OCInitStructure;
+            TIM_OCStructInit(&TIM_OCInitStructure);
             TIM_OCInitStructure.TIM_OCMode      = TIM_OCMode_PWM1;
             TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
             TIM_OCInitStructure.TIM_Pulse =
-                (channel->duty_cycle * pwm_config->period) / 10000;
+                (uint16_t)((uint32_t)channel->duty_cycle * pwm_config->period /
+                           10000);
             TIM_OCInitStructure.TIM_OCPolarity =
                 _get_oc_polarity(channel->polarity);
             TIM_OCInitStructure.TIM_OCIdleState =

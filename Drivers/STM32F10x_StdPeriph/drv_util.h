@@ -4,7 +4,7 @@
 #include "xhal_assert.h"
 #include "xhal_log.h"
 #include "xhal_time.h"
-#include XHAL_CMSIS_DEVICE_HEADER
+#include XHAL_DEVICE_HEADER
 
 void _gpio_clock_enable(const char *name);
 bool _check_pin_name_valid(const char *name);
