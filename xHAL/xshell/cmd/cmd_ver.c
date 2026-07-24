@@ -5,7 +5,6 @@
 #define CMD_VER_DESCRIPTION "ver: display system version information\r\n"
 
 #if SHELL_CMD_IS_ENABLED(VER)
-
 static int ver_cmd(int argc, char *argv[])
 {
     Shell *shell = shellGetCurrent();

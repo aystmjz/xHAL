@@ -29,7 +29,7 @@ static int meminfo_cmd(int argc, char *argv[])
                perused % 10);
 
     shellPrint(shell, "  Usage Bar   : [");
-    for (int i = 0; i < 50; i++)
+    for (uint8_t i = 0; i < 50; i++)
     {
         if (i < perused / 20)
             shellPrint(shell, "#");
