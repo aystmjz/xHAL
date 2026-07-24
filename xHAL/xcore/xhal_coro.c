@@ -11,14 +11,36 @@ XLOG_TAG("xCoro");
 #define XCORO_EVENT_NUM_MAX (64)
 #endif
 
+static xhal_tick_t stat_window_start_ms;
+static xhal_tick_t stat_idle_total_ms;
+
+static xhal_tick_t idle_enter_ms;
+static bool in_idle;
+
 static xcoro_event_t *xcoro_event_table[XCORO_EVENT_NUM_MAX];
 static uint16_t xcoro_event_count = 0;
+
+xhal_err_t xcoro_event_init(xcoro_event_t *event)
+{
+    xassert_not_null(event);
+
+    xmemset(event, 0, sizeof(*event));
+
+    return XHAL_OK;
+}
 
 xhal_err_t xcoro_event_add(xcoro_event_t *event)
 {
     xassert_not_null(event);
     xassert_not_null(event->name);
-    xassert_name(xcoro_event_find(event->name) == NULL, event->name);
+
+    for (uint16_t i = 0; i < XCORO_EVENT_NUM_MAX; i++)
+    {
+        if (xcoro_event_table[i] == event)
+        {
+            return XHAL_OK;
+        }
+    }
 
     for (uint16_t i = 0; i < XCORO_EVENT_NUM_MAX; i++)
     {
@@ -70,6 +92,11 @@ xcoro_event_t *xcoro_event_find(const char *name)
             event = xcoro_event_table[i];
             break;
         }
+    }
+
+    if (event == NULL)
+    {
+        XLOG_ERROR("Event %s not found", name);
     }
 
     return event;
@@ -321,6 +348,17 @@ void xcoro_sleep(xcoro_handle_t *handle, xhal_tick_t delay_ms)
     _sleep_list_insert(handle);
 }
 
+void xcoro_sleep_until(xcoro_handle_t *handle, xhal_tick_t tick_ms)
+{
+    xassert_not_null(handle);
+    xassert_not_null(handle->mgr);
+
+    handle->wakeup_tick_ms = tick_ms;
+    handle->state          = XCORO_STATE_SLEEPING;
+
+    _sleep_list_insert(handle);
+}
+
 void xcoro_wait_event(xcoro_handle_t *handle, xcoro_event_t *event,
                       uint32_t mask, uint32_t flags, uint32_t timeout_ms)
 {
@@ -368,6 +406,8 @@ void xcoro_wait_event(xcoro_handle_t *handle, xcoro_event_t *event,
 
 void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
 {
+    xassert_not_null(event);
+
     event->flags |= bits;
 
     xcoro_handle_t *handle = event->wait_list;
@@ -418,6 +458,17 @@ void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
 
     /* 重新挂回未触发的 waiters */
     event->wait_list = remain_list;
+}
+
+uint32_t xcoro_clear_event(xcoro_event_t *event, uint32_t bits)
+{
+    xassert_not_null(event);
+
+    uint32_t old = event->flags;
+
+    event->flags &= ~bits;
+
+    return old;
 }
 
 void xcoro_yield(xcoro_handle_t *handle)
@@ -494,6 +545,199 @@ void xcoro_finish(xcoro_handle_t *handle)
 void xcoro_request_shutdown(xcoro_manager_t *mgr)
 {
     mgr->shutdown_req = true;
+}
+
+static const char *_state_str(xcoro_state_t state)
+{
+    switch (state)
+    {
+    case XCORO_STATE_READY:
+        return "READY";
+    case XCORO_STATE_SLEEPING:
+        return "SLEEPING";
+    case XCORO_STATE_WAITING:
+        return "WAITING";
+    case XCORO_STATE_FINISHED:
+        return "FINISHED";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+static const char *_prio_str(xcoro_priority_t prio)
+{
+    switch (prio)
+    {
+    case XCORO_PRIO_IDLE:
+        return "IDLE";
+    case XCORO_PRIO_LOW:
+        return "LOW";
+    case XCORO_PRIO_NORMAL:
+        return "NORMAL";
+    case XCORO_PRIO_HIGH:
+        return "HIGH";
+    case XCORO_PRIO_REALTIME:
+        return "REALTIME";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+void xcoro_dump_handle(const xcoro_handle_t *handle)
+{
+    if (handle == NULL)
+    {
+        xlog_printf("xcoro: <null handle>\r\n");
+        return;
+    }
+
+    xlog_printf("xcoro @%p\r\n", handle);
+    xlog_printf("  entry       : 0x%p\r\n", handle->entry);
+    xlog_printf("  state       : %s (%d)\r\n", _state_str(handle->state),
+                handle->state);
+    xlog_printf("  prio        : %s (%d)\r\n", _prio_str(handle->prio),
+                handle->prio);
+    xlog_printf("  depth       : %u\r\n", handle->depth);
+    for (uint32_t lvl = 0; lvl < XCORO_PC_MAX_LEVEL; lvl++)
+    {
+        uint32_t pc_lvl = (handle)->pc[lvl];
+
+        xlog_printf("  pc[%u] = %u%s\r\n", lvl, pc_lvl,
+                    (lvl == handle->depth) ? " <active>" : "");
+    }
+    xlog_printf("  user_data   : 0x%p\r\n", handle->user_data);
+
+    if (handle->state == XCORO_STATE_SLEEPING)
+    {
+        xlog_printf("  wakeup_tick : %lu\r\n",
+                    (unsigned long)handle->wakeup_tick_ms);
+    }
+
+    if (handle->state == XCORO_STATE_WAITING)
+    {
+        xlog_printf("  waiting_evt : %p (%s)\r\n", handle->waiting_event,
+                    handle->waiting_event && handle->waiting_event->name
+                        ? handle->waiting_event->name
+                        : "noname");
+        xlog_printf("  wait_mask   : 0x%08lx\r\n", handle->wait_mask);
+        xlog_printf("  wait_flags  : 0x%08lx\r\n", handle->wait_flags);
+        xlog_printf("  wait_result : %ld\r\n", (long)handle->wait_result);
+    }
+}
+
+void xcoro_dump_event(const xcoro_event_t *evt)
+{
+    if (evt == NULL)
+    {
+        xlog_printf("xcoro_event: <null>\r\n");
+        return;
+    }
+
+    xlog_printf("xcoro_event @%p\r\n", evt);
+    xlog_printf("  name     : %s\r\n", evt->name ? evt->name : "noname");
+    xlog_printf("  flags    : 0x%08lx\r\n", evt->flags);
+    xlog_printf("  waitlist : %p\r\n", evt->wait_list);
+}
+
+void xcoro_dump_all(const xcoro_manager_t *mgr)
+{
+    if (mgr == NULL)
+    {
+        xlog_printf("xcoro_mgr: <null>\r\n");
+        return;
+    }
+
+    xlog_printf("========== xcoro manager dump begin ==========\r\n");
+
+    /* READY list */
+    xlog_printf("[READY LIST]\r\n");
+    if (mgr->ready_list == NULL)
+    {
+        xlog_printf("  <empty>\r\n");
+    }
+    else
+    {
+        const xcoro_handle_t *handle = mgr->ready_list;
+        while (handle)
+        {
+            xcoro_dump_handle(handle);
+            handle = handle->next;
+        }
+    }
+
+    /* SLEEP list */
+    xlog_printf("[SLEEP LIST]\r\n");
+    if (mgr->sleep_list == NULL)
+    {
+        xlog_printf("  <empty>\r\n");
+    }
+    else
+    {
+        const xcoro_handle_t *handle = mgr->sleep_list;
+        while (handle)
+        {
+            xcoro_dump_handle(handle);
+            handle = handle->next;
+        }
+    }
+
+    xlog_printf("=========== xcoro manager dump end ===========\r\n");
+}
+
+void xcoro_cpu_stat_init(void)
+{
+    stat_window_start_ms = xtime_get_tick_ms();
+    stat_idle_total_ms   = 0;
+    idle_enter_ms        = 0;
+    in_idle              = false;
+}
+
+void xcoro_cpu_stat_on_run(void)
+{
+    if (in_idle)
+    {
+        xhal_tick_t now = xtime_get_tick_ms();
+        stat_idle_total_ms += TIME_DIFF(now, idle_enter_ms);
+        in_idle = false;
+    }
+}
+
+void xcoro_cpu_stat_on_idle(void)
+{
+    if (!in_idle)
+    {
+        idle_enter_ms = xtime_get_tick_ms();
+        in_idle       = true;
+    }
+}
+
+uint16_t xcoro_cpu_usage_get(void)
+{
+    xhal_tick_t now = xtime_get_tick_ms();
+
+    xhal_tick_t idle_ms = stat_idle_total_ms;
+    if (in_idle)
+    {
+        idle_ms += TIME_DIFF(now, idle_enter_ms);
+    }
+
+    xhal_tick_t total_ms = TIME_DIFF(now, stat_window_start_ms);
+    if (total_ms == 0 || idle_ms >= total_ms)
+    {
+        return 0;
+    }
+
+    uint32_t usage = ((total_ms - idle_ms) * 10000U) / total_ms;
+
+    stat_window_start_ms = now;
+    stat_idle_total_ms   = 0;
+
+    if (in_idle)
+    {
+        idle_enter_ms = now;
+    }
+
+    return (uint16_t)usage;
 }
 
 void xcoro_scheduler_run(xcoro_manager_t *mgr)

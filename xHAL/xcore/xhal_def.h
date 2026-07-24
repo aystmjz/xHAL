@@ -19,15 +19,71 @@
     ERR(XHAL_ERR_MALLOC, -10, "Malloc failed")      \
     ERR(XHAL_ERR_NOT_ENOUGH, -11, "Not enough")     \
     ERR(XHAL_ERR_NO_INIT, -12, "Not initialized")   \
-    ERR(XHAL_ERR_BUS, -13, "Bus error")\
-    ERR(XHAL_ERR_NOT_SUPPORT, -14, "Not supported")
-
+    ERR(XHAL_ERR_BUS, -13, "Bus error")             \
+    ERR(XHAL_ERR_NOT_SUPPORT, -14, "Not supported") \
+    ERR(XHAL_ERR_NOT_FOUND, -15, "Not found")       \
+    ERR(XHAL_ERR_CRC, -16, "CRC error")
 typedef enum xhal_err
 {
 #define ERR(code, value, str) code = value,
     XHAL_ERR_LIST
 #undef ERR
 } xhal_err_t;
+
+#define XHAL_RETURN_IF_ERROR(ret, expr) \
+    do                                  \
+    {                                   \
+        (ret) = expr;                   \
+        if ((ret) != XHAL_OK)           \
+        {                               \
+            return (ret);               \
+        }                               \
+    } while (0)
+
+#define XHAL_GOTO_IF_ERROR(ret, expr, label) \
+    do                                       \
+    {                                        \
+        (ret) = expr;                        \
+        if ((ret) != XHAL_OK)                \
+        {                                    \
+            goto label;                      \
+        }                                    \
+    } while (0)
+
+#define XHAL_TRY(ret, expr)             XHAL_RETURN_IF_ERROR(ret, expr)
+#define XHAL_TRY_GOTO(ret, expr, label) XHAL_GOTO_IF_ERROR(ret, expr, label)
+
+#define XTRY(ret, expr)                 XHAL_TRY(ret, expr)
+#define XTRY_GOTO(ret, expr, label)     XHAL_TRY_GOTO(ret, expr, label)
+
+#define XHAL_MAX(a, b)                  (((a) > (b)) ? (a) : (b))
+#define XHAL_MIN(a, b)                  (((a) < (b)) ? (a) : (b))
+#define XHAL_ABS(x)                     ((x) < 0 ? -(x) : (x))
+
+#define XHAL_BOOL(x)                    (!!(x))
+
+/* 向上取整到 m 的倍数: ceil(x / m) * m */
+#define XHAL_CEIL(x, m)                 ((((x) + (m) - 1) / (m)) * (m))
+
+/* 向下取整到 m 的倍数: floor(x / m) * m */
+#define XHAL_FLOOR(x, m)                (((x) / (m)) * (m))
+
+/* 四舍五入到 m 的倍数: round(x / m) * m */
+#define XHAL_ROUND(x, m)                ((((x) + ((m) / 2)) / (m)) * (m))
+
+/* 限定范围 [low, high] */
+#define XHAL_CLAMP(val, low, high) \
+    ((val) <= (low) ? (low) : ((val) >= (high) ? (high) : (val)))
+
+/* 限定范围 [low, high] 且循环*/
+#define XHAL_LOOP(val, low, high) \
+    ((val) < (low) ? (high) : ((val) > (high) ? (low) : (val)))
+
+#define XHAL_ADD_SATURATE_MAX(val, add, max) \
+    (((val) + (add)) < (max) ? ((val) + (add)) : (max))
+
+#define XHAL_SUB_SATURATE_MIN(val, sub, min) \
+    (((val) > (sub) + (min)) ? ((val) - (sub)) : (min))
 
 #if defined(__linux__)
 #define XHAL_STR_ENTER "\n"
@@ -65,17 +121,18 @@ typedef uint32_t xhal_size_t;
 #error The currnet CPU is NOT supported!
 #endif
 
+typedef uint32_t u32;
+typedef uint16_t u16;
+typedef uint8_t u8;
+
 /**
  * Cast a member of a structure out to the containing structure.
  * @ptr:    the pointer to the member.
  * @type:   the type of the container struct this is embedded in.
  * @member: the name of the member within the struct.
  */
-#define xhal_container_of(pointer, type, member)        \
-    ({                                                  \
-        void *__pointer = (void *)(pointer);            \
-        ((type *)(__pointer - offsetof(type, member))); \
-    })
+#define xhal_container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
 
 #define xhal_offsetof(type, member) ((xhal_pointer_t) & ((type *)0)->member)
 

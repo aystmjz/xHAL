@@ -41,13 +41,13 @@
 #define XASSERT_BACKTRACE(sp)
 #endif
 
+#define XASSERT_INVALID_ID ((uint32_t)(-1))
+
 void _xassert_func(void);
 void _xassert(const char *condition, const char *extra, const char *tag,
               const char *file, const char *func, uint32_t line, uint32_t id);
 
 #if XASSERT_ENABLE != 0
-
-#define XASSERT_INVALID_ID ((uint32_t)(-1))
 /**
  * @brief  断言函数
  * @param  test   给定的条件

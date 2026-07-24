@@ -77,6 +77,11 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
  */
 #define XLOG_TAG(...) XLOG_TAG_IMPL_TF(__VA_ARGS__, XLOG_DEFAULT_OUTPUT)
 #else
+
+#define XLOG_TAG_IMPL_F(tag, write, ...)                \
+    extern void write(const void *data, uint32_t size); \
+    static const XHAL_USED xlog_output_t WRITE = write;
+
 #define XLOG_TAG(...) XLOG_TAG_IMPL_F(__VA_ARGS__, XLOG_DEFAULT_OUTPUT)
 #endif /* XLOG_COMPILE_LEVEL >= XLOG_LEVEL_ERROR */
 
@@ -118,16 +123,16 @@ xhal_err_t _xlog_print_log(xlog_output_t write, const char *name, uint8_t level,
     XLOG_ERROR("%s failed in %s: %s", info, __func__, xhal_err_to_str(err))
 
 #ifdef XDEBUG
-#define XLOG_CHECK_RET(write)            \
-    do                                   \
-    {                                    \
-        xhal_err_t ret;                  \
-        ret = write;                     \
-        if (ret != XHAL_OK)              \
-            XLOG_PRINT_ERR(#write, ret); \
+#define XLOG_CHECK_RET(expr)            \
+    do                                  \
+    {                                   \
+        xhal_err_t ret;                 \
+        ret = expr;                     \
+        if (ret != XHAL_OK)             \
+            XLOG_PRINT_ERR(#expr, ret); \
     } while (0)
 #else
-#define XLOG_CHECK_RET(write) write
+#define XLOG_CHECK_RET(expr) expr
 #endif
 
 #endif /* __XLOG_H */

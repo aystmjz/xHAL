@@ -4,11 +4,6 @@
 #include "xhal_config.h"
 #include "xhal_def.h"
 
-#define XHAL_VALID_RAM_START   (0x20000000U)
-#define XHAL_VALID_RAM_END     (0x20004FFFU)
-#define XHAL_VALID_FLASH_START (0x08000000U)
-#define XHAL_VALID_FLASH_END   (0x08020000U)
-
 #define XHAL_IS_VALID_RAM_ADDRESS(addr)                  \
     (((xhal_pointer_t)(addr) >= XHAL_VALID_RAM_START) && \
      ((xhal_pointer_t)(addr) <= XHAL_VALID_RAM_END))

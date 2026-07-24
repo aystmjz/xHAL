@@ -637,6 +637,8 @@ static void _export_poll_coro_func(void)
     xhal_export_poll_data_t *data;
     xcoro_manager_t *mgr = &xexport_coro_manager;
 
+    xcoro_cpu_stat_init();
+
     while (1)
     {
         for (uint32_t i = 0; i < xexport_poll_count; i++)
@@ -647,6 +649,7 @@ static void _export_poll_coro_func(void)
 
             if (TIME_BEFOR(data->wakeup_tick_ms, start))
             {
+                xcoro_cpu_stat_on_run();
                 ((void (*)(void))xexport_poll_table[i].func)();
 
                 xhal_tick_t end = xtime_get_tick_ms();
@@ -667,9 +670,14 @@ static void _export_poll_coro_func(void)
 
         /* 有 READY 协程直接运行 */
         xcoro_handle_t *handle = _get_next_ready(mgr);
-        if (handle ? handle->entry : NULL)
+        if (handle && handle->entry)
         {
+            xcoro_cpu_stat_on_run();
             handle->entry(handle);
+        }
+        else
+        {
+            xcoro_cpu_stat_on_idle();
         }
     } /* while (1) */
 }

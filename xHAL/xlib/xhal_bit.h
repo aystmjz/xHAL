@@ -1,6 +1,87 @@
 #ifndef __XHAL_BIT_H
 #define __XHAL_BIT_H
 
+/* ============================================
+ * xhal_bit.h 位操作速查表
+ * ============================================
+ *
+ * 单个位操作:
+ * ----------
+ * BIT(nr)                     // 生成第nr位的掩码
+ * BIT_SET0(var, n)            // 设置第n位为0
+ * BIT_SET1(var, n)            // 设置第n位为1
+ * BIT_SET(var, n, val)        // 设置第n位为val(0/1)
+ * BIT_FLIP(var, n)            // 翻转第n位
+ * BIT_GET(src, n)             // 获取第n位的值
+ * BIT_GET_MODIFY0(src, n)     // 获取第n位置0后的值
+ * BIT_GET_MODIFY1(src, n)     // 获取第n位置1后的值
+ * BIT_GET_MODIFY(src, n, val) // 获取第n位置为val后的值
+ * BIT_GET_MODIFY_FLIP(src, n) // 获取第n位翻转后的值
+ *
+ * 多位操作:
+ * ----------
+ * BITS_MASK(n)                      // 生成低n位为1的掩码
+ * BITS_SET0(var, mask)              // 设置掩码位为0
+ * BITS_SET1(var, mask)              // 设置掩码位为1
+ * BITS_FLIP(var, mask)              // 翻转掩码位
+ * BITS_GET(src, n, off)             // 获取从off位开始的n位数据
+ * BITS_CHECK(src, mask)             // 检查掩码位是否有1
+ * BITS_GET_MODIFY(src, n, off, val) // 获取修改多位后的值
+ * BITS_SET(src, n, off, val)        // 直接修改多位
+ *
+ * 常用位定义:
+ * ----------
+ * #define BIT0  0x00000001
+ * #define BIT1  0x00000002
+ * #define BIT2  0x00000004
+ * #define BIT3  0x00000008
+ * #define BIT4  0x00000010
+ * #define BIT5  0x00000020
+ * #define BIT6  0x00000040
+ * #define BIT7  0x00000080
+ * #define BIT8  0x00000100
+ * #define BIT9  0x00000200
+ * #define BIT10 0x00000400
+ * #define BIT11 0x00000800
+ * #define BIT12 0x00001000
+ * #define BIT13 0x00002000
+ * #define BIT14 0x00004000
+ * #define BIT15 0x00008000
+ * #define BIT16 0x00010000
+ * #define BIT17 0x00020000
+ * #define BIT18 0x00040000
+ * #define BIT19 0x00080000
+ * #define BIT20 0x00100000
+ * #define BIT21 0x00200000
+ * #define BIT22 0x00400000
+ * #define BIT23 0x00800000
+ * #define BIT24 0x01000000
+ * #define BIT25 0x02000000
+ * #define BIT26 0x04000000
+ * #define BIT27 0x08000000
+ * #define BIT28 0x10000000
+ * #define BIT29 0x20000000
+ * #define BIT30 0x40000000
+ * #define BIT31 0x80000000
+ *
+ * 使用示例:
+ * ----------
+ * uint32_t reg = 0;
+ * BIT_SET1(reg, 5);                    // 设置第5位为1
+ * BIT_SET0(reg, 3);                    // 设置第3位为0
+ * BIT_FLIP(reg, 7);                    // 翻转第7位
+ * int bit_val = BIT_GET(reg, 5);       // 获取第5位的值
+ *
+ * BITS_SET1(reg, 0x0F);                // 设置低4位为1
+ * BITS_SET0(reg, 0xF0);                // 设置第4-7位为0
+ * uint32_t bits = BITS_GET(reg, 8, 4); // 获取第4-11位
+ *
+ * 注意:
+ * - 位编号从0开始，BIT0是最低位
+ * - 主要针对32位无符号整数
+ * - 不是原子操作，多线程需要加锁
+ * ============================================ */
+
 #if (!defined(BIT0))
 #define BIT31 0x80000000
 #define BIT30 0x40000000
