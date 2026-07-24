@@ -4,9 +4,6 @@
 
 XLOG_TAG("xCRC32");
 
-#define XCRC32_INIT   (0U)
-#define XCRC32_XOROUT (0xFFFFFFFFU)
-
 static const uint32_t crc32_table[] = {
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
     0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -72,4 +69,29 @@ uint32_t xcrc32(uint32_t crc, const void *data, uint32_t size)
     }
 
     return crc ^ XCRC32_XOROUT;
+}
+
+uint8_t xcrc8(uint8_t crc, const void *data, uint32_t size)
+{
+    xassert(data != NULL || size == 0);
+
+    const uint8_t *p = (const uint8_t *)data;
+
+    while (size--)
+    {
+        crc ^= *p++;
+        for (uint8_t i = 0; i < 8; i++)
+        {
+            if (crc & 0x80)
+            {
+                crc = (crc << 1) ^ XCRC8_POLY;
+            }
+            else
+            {
+                crc <<= 1;
+            }
+        }
+    }
+
+    return crc ^ XCRC8_XOROUT;
 }
