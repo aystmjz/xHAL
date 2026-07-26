@@ -180,6 +180,160 @@ xhal_err_t xtime_get_format_uptime(char *time_str, uint32_t buff_len)
     return XHAL_OK;
 }
 
+static inline bool _is_leap_year(uint16_t year)
+{
+    /* 公历闰年规则 */
+    return ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0));
+}
+
+uint8_t xtime_days_in_month(uint16_t year, uint8_t month)
+{
+    const uint8_t days_table[12] = {31, 28, 31, 30, 31, 30,
+                                    31, 31, 30, 31, 30, 31};
+
+    if (month == 2 && _is_leap_year(year))
+    {
+        return 29;
+    }
+
+    return days_table[month - 1];
+}
+
+static inline uint8_t _calc_weekday(uint16_t year, uint8_t month, uint8_t day)
+{
+    if (month < 3)
+    {
+        month += 12;
+        year -= 1;
+    }
+
+    uint8_t k = year % 100;
+    uint8_t j = year / 100;
+
+    /*  Zeller公式 */
+    uint8_t h = (day + 13 * (month + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+
+    return (uint8_t)((h + 6) % 7);
+}
+
+bool xtime_is_valid_time(const xhal_time_t *time)
+{
+    if (time->hour > 23)
+        return false;
+    if (time->minute > 59)
+        return false;
+    if (time->second > 59)
+        return false;
+    return true;
+}
+
+bool xtime_is_valid_date(const xhal_time_t *time)
+{
+    if (time == NULL)
+    {
+        return false;
+    }
+
+    if (time->year < 1970 || time->year > 2099)
+    {
+        return false;
+    }
+
+    if (time->month < 1 || time->month > 12)
+    {
+        return false;
+    }
+
+    uint8_t max_day = xtime_days_in_month(time->year, time->month);
+    if (time->day < 1 || time->day > max_day)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+xhal_err_t xtime_adjust_weekday(xhal_time_t *time)
+{
+    xassert_not_null(time);
+
+    if (!xtime_is_valid_date(time))
+    {
+        return XHAL_ERR_INVALID;
+    }
+
+    time->weekday = _calc_weekday(time->year, time->month, time->day);
+
+    return XHAL_OK;
+}
+
+xhal_err_t xtime_timestamp_to_time(xhal_ts_t ts, xhal_time_t *time)
+{
+    xassert_not_null(time);
+
+    struct tm timeinfo;
+
+    if (localtime_r(&ts, &timeinfo) == NULL)
+    {
+        return XHAL_ERR_INVALID;
+    }
+
+    time->year    = (uint16_t)(timeinfo.tm_year + 1900);
+    time->month   = (uint8_t)(timeinfo.tm_mon + 1);
+    time->day     = (uint8_t)timeinfo.tm_mday;
+    time->hour    = (uint8_t)timeinfo.tm_hour;
+    time->minute  = (uint8_t)timeinfo.tm_min;
+    time->second  = (uint8_t)timeinfo.tm_sec;
+    time->weekday = (uint8_t)timeinfo.tm_wday; /* 0=Sunday */
+
+    return XHAL_OK;
+}
+
+xhal_err_t xtime_time_to_timestamp(xhal_time_t *time, xhal_ts_t *ts)
+{
+    xassert_not_null(time);
+
+    if (!xtime_is_valid_date(time) || !xtime_is_valid_time(time))
+    {
+        return XHAL_ERR_INVALID;
+    }
+
+    struct tm timeinfo;
+    timeinfo.tm_year  = time->year - 1900;
+    timeinfo.tm_mon   = time->month - 1;
+    timeinfo.tm_mday  = time->day;
+    timeinfo.tm_hour  = time->hour;
+    timeinfo.tm_min   = time->minute;
+    timeinfo.tm_sec   = time->second;
+    timeinfo.tm_isdst = 0;
+
+    time_t timestamp = mktime(&timeinfo);
+    if (timestamp == (time_t)(-1))
+    {
+        return XHAL_ERR_INVALID;
+    }
+
+    time->weekday = (uint8_t)timeinfo.tm_wday;
+
+    *ts = (xhal_ts_t)timestamp;
+
+    return XHAL_OK;
+}
+
+xhal_err_t xtime_get_time(xhal_time_t *time)
+{
+    xassert_not_null(time);
+
+    xhal_ts_t ts = xtime_get_ts();
+
+    if (ts == XTIME_INVALID_TS)
+    {
+        return XHAL_ERR_NO_INIT;
+    }
+
+    return xtime_timestamp_to_time(ts, time);
+}
+
 /**
  * @brief  获取当前时间戳
  * @retval 当前时间戳，如果未设置基准时间则返回无效时间戳
