@@ -19,7 +19,6 @@ static inline void _unlock(xencoder_t *encoder);
 xhal_err_t xencoder_init(xencoder_t *encoder, const xencoder_ops_t *ops)
 {
     xassert_not_null(encoder);
-    xassert_not_null(ops);
     xassert_ptr_struct_not_null(ops, "xencoder_ops is null");
 
     encoder->ops           = ops;

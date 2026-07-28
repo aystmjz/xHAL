@@ -24,7 +24,7 @@ static void _calculate_percentage(xbattery_t *battery);
 static void _update_voltage_buffer(xbattery_t *battery, uint16_t voltage_mv);
 static uint16_t _get_average_voltage(xbattery_t *battery);
 
-xhal_err_t xbattery_init(xbattery_t *battery, xbattery_config_t *config)
+xhal_err_t xbattery_init(xbattery_t *battery, const xbattery_config_t *config)
 {
     xassert_not_null(battery);
 
@@ -82,8 +82,8 @@ xhal_err_t xbattery_update(xbattery_t *battery, uint16_t voltage_mv)
 
     _lock(battery);
     _update_voltage_buffer(battery, voltage_mv);
-    _calculate_percentage(battery);
     _update_battery_state(battery);
+    _calculate_percentage(battery);
     _unlock(battery);
 
     return XHAL_OK;
@@ -161,8 +161,8 @@ xhal_err_t xbattery_set_config(xbattery_t *battery,
 
     _lock(battery);
     battery->config = *config;
-    _calculate_percentage(battery);
     _update_battery_state(battery);
+    _calculate_percentage(battery);
     _unlock(battery);
 
     return XHAL_OK;
@@ -187,30 +187,40 @@ xhal_err_t xbattery_get_config(xbattery_t *battery, xbattery_config_t *config)
 
 static void _update_battery_state(xbattery_t *battery)
 {
-    uint16_t avg_voltage = _get_average_voltage(battery);
+    static xbattery_state_t last_state = XBATTERY_STATE_EMPTY;
+    uint16_t voltage                   = battery->voltage_mv[0];
 
-    if (avg_voltage == 0)
+    if (voltage == 0)
     {
         battery->state = XBATTERY_STATE_NORMAL;
         return;
     }
 
-    if (avg_voltage >= battery->config.power_threshold)
+    if (voltage >= battery->config.power_threshold)
     {
         battery->state = XBATTERY_STATE_POWER;
     }
-    else if (avg_voltage >= battery->config.charge_threshold)
+    else if (voltage >= battery->config.charge_threshold)
     {
         battery->state = XBATTERY_STATE_CHARGING;
     }
-    else if (avg_voltage >= battery->config.empty_voltage_mv)
+    else if (voltage >= battery->config.empty_voltage_mv)
     {
         battery->state = XBATTERY_STATE_NORMAL;
+        if (last_state != XBATTERY_STATE_NORMAL)
+        {
+            for (uint8_t i = 1; i < XBATTERY_VOLTAGE_BUFFER_SIZE; i++)
+            {
+                battery->voltage_mv[i] = battery->voltage_mv[0];
+            }
+        }
     }
     else
     {
         battery->state = XBATTERY_STATE_EMPTY;
     }
+
+    last_state = battery->state;
 }
 
 static void _calculate_percentage(xbattery_t *battery)

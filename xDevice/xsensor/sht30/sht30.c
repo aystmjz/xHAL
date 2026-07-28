@@ -17,7 +17,7 @@ XLOG_TAG("SHT30");
 
 static xhal_err_t sht30_init(void *inst);
 static xhal_err_t sht30_deinit(void *inst);
-static void sht30_reset(xcoro_handle_t *handle, void *inst,
+static void sht30_res(xcoro_handle_t *handle, void *inst,
                         xsensor_event_t *event);
 static void sht30_read(xcoro_handle_t *handle, void *inst,
                        xsensor_event_t *event);
@@ -25,7 +25,7 @@ static void sht30_read(xcoro_handle_t *handle, void *inst,
 const xsensor_ops_t sht30_ops = {
     .init   = sht30_init,
     .deinit = sht30_deinit,
-    .reset  = sht30_reset,
+    .reset  = sht30_res,
     .read   = sht30_read,
 };
 
@@ -45,7 +45,7 @@ static xhal_err_t sht30_deinit(void *inst)
     return XHAL_OK;
 }
 
-static void sht30_reset(xcoro_handle_t *handle, void *inst,
+static void sht30_res(xcoro_handle_t *handle, void *inst,
                         xsensor_event_t *event)
 {
     sht30_dev_t *dev = SHT30_DEV_CAST(inst);

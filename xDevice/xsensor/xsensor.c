@@ -23,7 +23,6 @@ static inline void _unlock(xsensor_t *sensor);
 xhal_err_t xsensor_init(xsensor_t *sensor, const xsensor_ops_t *ops, void *inst)
 {
     xassert_not_null(sensor);
-    xassert_not_null(ops);
     xassert_not_null(inst);
     xassert_ptr_struct_not_null(ops, "xsensor_ops is null");
 

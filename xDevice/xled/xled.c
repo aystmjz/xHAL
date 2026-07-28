@@ -19,7 +19,6 @@ static inline void _unlock(xled_t *led);
 xhal_err_t xled_init(xled_t *led, const xled_ops_t *ops, xled_state_t state)
 {
     xassert_not_null(led);
-    xassert_not_null(ops);
     xassert_ptr_struct_not_null(ops, "xled_ops is null");
 
     led->ops   = ops;
@@ -67,52 +66,12 @@ xhal_err_t xled_deinit(xled_t *led)
 
 xhal_err_t xled_on(xled_t *led)
 {
-    xassert_not_null(led);
-
-    if (!led->ops)
-    {
-        return XHAL_ERR_NO_INIT;
-    }
-
-    xhal_err_t ret = XHAL_OK;
-
-    _lock(led);
-    if (led->state != XLED_STATE_ON)
-    {
-        ret = led->ops->set_state(led, XLED_STATE_ON);
-        if (ret == XHAL_OK)
-        {
-            led->state = XLED_STATE_ON;
-        }
-    }
-    _unlock(led);
-
-    return ret;
+    return xled_set_state(led, XLED_STATE_ON);
 }
 
 xhal_err_t xled_off(xled_t *led)
 {
-    xassert_not_null(led);
-
-    if (!led->ops)
-    {
-        return XHAL_ERR_NO_INIT;
-    }
-
-    xhal_err_t ret = XHAL_OK;
-
-    _lock(led);
-    if (led->state != XLED_STATE_OFF)
-    {
-        ret = led->ops->set_state(led, XLED_STATE_OFF);
-        if (ret == XHAL_OK)
-        {
-            led->state = XLED_STATE_OFF;
-        }
-    }
-    _unlock(led);
-
-    return ret;
+    return xled_set_state(led, XLED_STATE_OFF);
 }
 
 xhal_err_t xled_toggle(xled_t *led)
@@ -163,14 +122,27 @@ xhal_err_t xled_get_state(xled_t *led, xled_state_t *state)
 
 xhal_err_t xled_set_state(xled_t *led, xled_state_t state)
 {
-    if (state == XLED_STATE_ON)
+    xassert_not_null(led);
+
+    if (!led->ops)
     {
-        return xled_on(led);
+        return XHAL_ERR_NO_INIT;
     }
-    else
+
+    xhal_err_t ret = XHAL_OK;
+
+    _lock(led);
+    if (led->state != state)
     {
-        return xled_off(led);
+        ret = led->ops->set_state(led, state);
+        if (ret == XHAL_OK)
+        {
+            led->state = state;
+        }
     }
+    _unlock(led);
+
+    return ret;
 }
 
 static inline void _lock(xled_t *led)

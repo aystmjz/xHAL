@@ -21,7 +21,6 @@ static inline void _unlock(xflash_t *flash);
 xhal_err_t xflash_init(xflash_t *flash, const xflash_ops_t *ops, void *inst)
 {
     xassert_not_null(flash);
-    xassert_not_null(ops);
     xassert_not_null(inst);
     xassert_ptr_struct_not_null(ops, "xflash_ops is null");
 

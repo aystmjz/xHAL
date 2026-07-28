@@ -35,7 +35,7 @@ typedef struct xbattery
 #endif
 } xbattery_t;
 
-xhal_err_t xbattery_init(xbattery_t *battery, xbattery_config_t *config);
+xhal_err_t xbattery_init(xbattery_t *battery, const xbattery_config_t *config);
 xhal_err_t xbattery_deinit(xbattery_t *battery);
 
 xhal_err_t xbattery_update(xbattery_t *battery, uint16_t voltage_mv);

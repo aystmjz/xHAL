@@ -21,7 +21,6 @@ xhal_err_t xbuzzer_init(xbuzzer_t *buzzer, const xbuzzer_ops_t *ops,
                         uint16_t duty_percent)
 {
     xassert_not_null(buzzer);
-    xassert_not_null(ops);
     xassert_ptr_struct_not_null(ops, "xbuzzer_ops is null");
 
     buzzer->ops                = ops;

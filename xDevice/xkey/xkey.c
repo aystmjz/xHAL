@@ -145,6 +145,8 @@ xhal_err_t xkey_poll(xkey_manager_t *mgr, xhal_tick_t now_tick)
         return XHAL_ERR_NO_INIT;
     }
 
+    xhal_err_t ret = XHAL_OK;
+
     _lock(mgr);
     /* 未到扫描周期，直接退出 */
     if (TIME_DIFF(now_tick, mgr->last_scan_tick) <
@@ -162,8 +164,7 @@ xhal_err_t xkey_poll(xkey_manager_t *mgr, xhal_tick_t now_tick)
         key->last_state = key->curr_state;
 
         /* 读取当前按键状态 */
-        xhal_err_t ret = key->state_cb(key, &key->curr_state);
-        if (ret != XHAL_OK)
+        if (key->state_cb(key, &key->curr_state) != XHAL_OK)
         {
             continue;
         }
@@ -224,6 +225,10 @@ xhal_err_t xkey_poll(xkey_manager_t *mgr, xhal_tick_t now_tick)
             {
                 xrbuf_write(&mgr->evt_rb, &event, sizeof(event));
             }
+            else
+            {
+                ret = XHAL_ERR_FULL;
+            }
 
             /* 重置事件状态 */
             key->event_active = 0;
@@ -234,7 +239,7 @@ xhal_err_t xkey_poll(xkey_manager_t *mgr, xhal_tick_t now_tick)
 exit:
     _unlock(mgr);
 
-    return XHAL_OK;
+    return ret;
 }
 
 xhal_err_t xkey_get_state(xkey_t *key, xkey_state_t *state)

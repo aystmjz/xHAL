@@ -63,24 +63,23 @@ static xhal_err_t w25q128_read_id(void *inst, uint8_t *manufacturer_id,
                                   uint16_t *device_id, uint32_t timeout_ms)
 {
     w25q128_dev_t *dev = W25Q128_DEV_CAST(inst);
-    uint8_t cmd        = W25Q128_JEDEC_ID;
-    uint8_t recv[3]    = {0};
-    xhal_err_t ret     = XHAL_OK;
 
-    XHAL_GOTO_IF_ERROR(ret, _wait_busy(dev, timeout_ms), exit);
+    xhal_err_t ret  = XHAL_OK;
+    uint8_t cmd     = W25Q128_JEDEC_ID;
+    uint8_t recv[3] = {0};
 
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->cs_select(), exit);
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(&cmd, NULL, 1, timeout_ms),
-                       deselect);
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(NULL, recv, 3, timeout_ms),
-                       deselect);
+    XTRY_GOTO(ret, _wait_busy(dev, timeout_ms), exit);
+
+    XTRY_GOTO(ret, dev->bus->cs_select(), exit);
+    XTRY_GOTO(ret, dev->bus->transfer(&cmd, NULL, 1, timeout_ms), deselect);
+    XTRY_GOTO(ret, dev->bus->transfer(NULL, recv, 3, timeout_ms), deselect);
 
     *manufacturer_id = recv[0];
     BITS_SET(*device_id, 8, 8, recv[1]);
     BITS_SET(*device_id, 8, 0, recv[2]);
 
 deselect:
-    dev->bus->cs_deselect();
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 exit:
     return ret;
 }
@@ -104,15 +103,14 @@ static xhal_err_t w25q128_read(void *inst, uint32_t address, uint8_t *buffer,
         BITS_GET(address, 8, 0),
     };
 
-    XHAL_GOTO_IF_ERROR(ret, _wait_busy(dev, timeout_ms), exit);
+    XTRY_GOTO(ret, _wait_busy(dev, timeout_ms), exit);
 
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->cs_select(), exit);
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(cmd, NULL, 4, timeout_ms),
-                       deselect);
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(NULL, buffer, size, timeout_ms),
-                       deselect);
+    XTRY_GOTO(ret, dev->bus->cs_select(), exit);
+    XTRY_GOTO(ret, dev->bus->transfer(cmd, NULL, 4, timeout_ms), deselect);
+    XTRY_GOTO(ret, dev->bus->transfer(NULL, buffer, size, timeout_ms),
+              deselect);
 deselect:
-    dev->bus->cs_deselect();
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 exit:
     return ret;
 }
@@ -130,10 +128,6 @@ static xhal_err_t w25q128_write(void *inst, uint32_t address,
         return XHAL_ERR_INVALID;
     }
 
-    XHAL_GOTO_IF_ERROR(ret, _wait_busy(dev, timeout_ms), exit);
-    XHAL_GOTO_IF_ERROR(ret, _write_enable(dev, timeout_ms), exit);
-
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->cs_select(), exit);
     while (size)
     {
         uint32_t page_off  = address % W25Q128_PAGE_SIZE;
@@ -144,24 +138,29 @@ static xhal_err_t w25q128_write(void *inst, uint32_t address,
             write_len = size;
         }
 
+        XTRY_GOTO(ret, _wait_busy(dev, timeout_ms), exit);
+        XTRY_GOTO(ret, _write_enable(dev, timeout_ms), exit);
+
         uint8_t cmd[4] = {
             W25Q128_PAGE_PROGRAM,
             BITS_GET(address, 8, 16),
             BITS_GET(address, 8, 8),
             BITS_GET(address, 8, 0),
         };
-        XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(cmd, NULL, 4, timeout_ms),
-                           deselect);
-        XHAL_GOTO_IF_ERROR(
-            ret, dev->bus->transfer(data, NULL, write_len, timeout_ms),
-            deselect);
+        XTRY_GOTO(ret, dev->bus->cs_select(), exit);
+        XTRY_GOTO(ret, dev->bus->transfer(cmd, NULL, 4, timeout_ms), deselect);
+        XTRY_GOTO(ret, dev->bus->transfer(data, NULL, write_len, timeout_ms),
+                  deselect);
+        XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 
         address += write_len;
         data += write_len;
         size -= write_len;
     }
+    return ret;
+
 deselect:
-    dev->bus->cs_deselect();
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 exit:
     return ret;
 }
@@ -171,8 +170,9 @@ static void w25q128_erase(xcoro_handle_t *handle, void *inst,
 {
     static xhal_tick_t start_tick = 0;
 
-    w25q128_dev_t *dev = W25Q128_DEV_CAST(inst);
-    xhal_err_t ret     = XHAL_OK;
+    w25q128_dev_t *dev  = W25Q128_DEV_CAST(inst);
+    xhal_err_t ret      = XHAL_OK;
+    xhal_err_t busy_ret = XHAL_OK;
 
     uint8_t cmd[4] = {
         W25Q128_SECTOR_ERASE_4KB,
@@ -204,27 +204,41 @@ static void w25q128_erase(xcoro_handle_t *handle, void *inst,
         goto exit;
     }
 
-    XHAL_GOTO_IF_ERROR(ret, _wait_busy(dev, event->timeout_ms), exit);
-    XHAL_GOTO_IF_ERROR(ret, _write_enable(dev, event->timeout_ms), exit);
+    XTRY_GOTO(ret, _wait_busy(dev, event->timeout_ms), exit);
+    XTRY_GOTO(ret, _write_enable(dev, event->timeout_ms), exit);
 
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->cs_select(), exit);
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(cmd, NULL, 4, event->timeout_ms),
-                       deselect);
+    XTRY_GOTO(ret, dev->bus->cs_select(), exit);
+    XTRY_GOTO(ret, dev->bus->transfer(cmd, NULL, 4, event->timeout_ms),
+              deselect);
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 
     start_tick = xtime_get_tick_ms();
-    while (_wait_busy(dev, 0) != XHAL_OK)
+    while (1)
     {
+        busy_ret = _wait_busy(dev, 0);
+
+        if (busy_ret == XHAL_OK)
+        {
+            goto exit;
+        }
+
+        if (busy_ret != XHAL_ERR_TIMEOUT)
+        {
+            ret = busy_ret;
+            goto exit;
+        }
+
         if (TIME_DIFF(xtime_get_tick_ms(), start_tick) >= event->timeout_ms)
         {
             ret = XHAL_ERR_TIMEOUT;
-            break;
+            goto exit;
         }
 
         XCORO_DELAY_MS(handle, 1);
     }
 
 deselect:
-    dev->bus->cs_deselect();
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 exit:
     if (event->cb)
     {
@@ -238,12 +252,11 @@ static xhal_err_t _write_enable(w25q128_dev_t *dev, uint32_t timeout_ms)
     uint8_t cmd    = W25Q128_WRITE_ENABLE;
     xhal_err_t ret = XHAL_OK;
 
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->cs_select(), exit);
-    XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(&cmd, NULL, 1, timeout_ms),
-                       deselect);
+    XTRY_GOTO(ret, dev->bus->cs_select(), exit);
+    XTRY_GOTO(ret, dev->bus->transfer(&cmd, NULL, 1, timeout_ms), deselect);
 
 deselect:
-    dev->bus->cs_deselect();
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 exit:
     return ret;
 }
@@ -257,12 +270,10 @@ static xhal_err_t _wait_busy(w25q128_dev_t *dev, uint32_t timeout_ms)
     timeout_ms++;
     while (timeout_ms--)
     {
-        XHAL_GOTO_IF_ERROR(ret, dev->bus->cs_select(), exit);
-        XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(&cmd, NULL, 1, 10),
-                           deselect);
-        XHAL_GOTO_IF_ERROR(ret, dev->bus->transfer(NULL, &status, 1, 10),
-                           deselect);
-        dev->bus->cs_deselect();
+        XTRY_GOTO(ret, dev->bus->cs_select(), exit);
+        XTRY_GOTO(ret, dev->bus->transfer(&cmd, NULL, 1, 10), deselect);
+        XTRY_GOTO(ret, dev->bus->transfer(NULL, &status, 1, 10), deselect);
+        XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 
         /* WIP = bit0, 0 表示空闲 */
         if (BIT_GET(status, 0) == 0)
@@ -277,8 +288,9 @@ static xhal_err_t _wait_busy(w25q128_dev_t *dev, uint32_t timeout_ms)
     }
 
     return XHAL_ERR_TIMEOUT;
+
 deselect:
-    dev->bus->cs_deselect();
+    XTRY_GOTO(ret, dev->bus->cs_deselect(), exit);
 exit:
     return ret;
 }

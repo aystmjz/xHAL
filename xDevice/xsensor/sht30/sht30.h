@@ -24,15 +24,15 @@ typedef struct sht30_bus_ops
                         uint32_t timeout_ms);
 } sht30_bus_ops_t;
 
-typedef struct sht30_reset_ops
+typedef struct sht30_res_ops
 {
     xhal_err_t (*trigger)(bool state);
-} sht30_reset_ops_t;
+} sht30_res_ops_t;
 
 typedef struct sht30_dev
 {
     const sht30_bus_ops_t *bus;
-    const sht30_reset_ops_t *reset;
+    const sht30_res_ops_t *reset;
 } sht30_dev_t;
 
 extern const xsensor_ops_t sht30_ops;
