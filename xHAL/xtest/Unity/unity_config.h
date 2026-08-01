@@ -1,11 +1,10 @@
 /* =========================================================================
     Unity - A Test Framework for C
     ThrowTheSwitch.org
-    Copyright (c) 2007-25 Mike Karlesky, Mark VanderVoord, & Greg Williams
+    Copyright (c) 2007-26 Mike Karlesky, Mark VanderVoord, & Greg Williams
     SPDX-License-Identifier: MIT
 ========================================================================= */
-#include "../../xcore/xhal_def.h"
-#include "../../xcore/xhal_log.h"
+
 /* Unity Configuration
  * As of May 11th, 2016 at ThrowTheSwitch/Unity commit 837c529
  * Update: December 29th, 2016
@@ -84,7 +83,7 @@
  *
  * Example:
  */
-#define UNITY_INT_WIDTH      32
+/* #define UNITY_INT_WIDTH 16 */
 
 /* Define this to be the number of bits a `long` takes up on your system. The
  * default, if not autodetected, is 32 bits. This is used to figure out what
@@ -94,7 +93,7 @@
  *
  * Example:
  */
-#define UNITY_LONG_WIDTH     32
+/* #define UNITY_LONG_WIDTH 16 */
 
 /* Define this to be the number of bits a pointer takes up on your system. The
  * default, if not autodetected, is 32-bits. If you're getting ugly compiler
@@ -102,7 +101,7 @@
  *
  * Example:
  */
-#define UNITY_POINTER_WIDTH  32
+/* #define UNITY_POINTER_WIDTH 64 */
 
 /* Unity will automatically include 64-bit support if it auto-detects it, or if
  * your `int`, `long`, or pointer widths are greater than 32-bits. Define this
@@ -197,6 +196,10 @@
  */
 /* #define UNITY_INCLUDE_PRINT_FORMATTED */
 
+#define UNITY_INCLUDE_PRINT_FORMATTED
+
+#define UNITY_OUTPUT_COLOR
+
 /* *************************** TOOLSET CUSTOMIZATION ***************************
  * In addition to the options listed above, there are a number of other options
  * which will come in handy to customize Unity's behavior for your specific
@@ -222,16 +225,23 @@
  * `stdout` option. You decide to route your test result output to a custom
  * serial `RS232_putc()` function you wrote like thus:
  */
-#define UNITY_OUTPUT_CHAR(c) _xlog_printf(XLOG_DEFAULT_OUTPUT, "%c", c)
 
-#define UNITY_OUTPUT_CHAR_HEADER_DECLARATION                            \
-    xhal_err_t _xlog_printf(xlog_output_t write, const char *fmt, ...); \
-    extern void XLOG_DEFAULT_OUTPUT(const void *data, uint32_t size);
+#include "xhal_config.h"
 
+#define UNITY_OUTPUT_CHAR(c)                 unity_putc(c)
+
+#define UNITY_OUTPUT_CHAR_HEADER_DECLARATION unity_putc(char c)
+
+/* #define UNITY_OUTPUT_CHAR(a)                    RS232_putc(a) */
+/* #define UNITY_OUTPUT_CHAR_HEADER_DECLARATION    RS232_putc(int) */
 /* #define UNITY_OUTPUT_FLUSH()                    RS232_flush() */
 /* #define UNITY_OUTPUT_FLUSH_HEADER_DECLARATION   RS232_flush(void) */
-/* #define UNITY_OUTPUT_START()                    RS232_config(115200,1,8,0) */
-/* #define UNITY_OUTPUT_COMPLETE()                 RS232_close() */
+/* #define UNITY_OUTPUT_START()                       RS232_config(115200,1,8,0)
+ */
+/* #define UNITY_OUTPUT_START_HEADER_DECLARATION RS232_config(int,int,int,int)
+ */
+/* #define UNITY_OUTPUT_COMPLETE()                    RS232_close() */
+/* #define UNITY_OUTPUT_COMPLETE_HEADER_DECLARATION    RS232_close(void) */
 
 /* Some compilers require a custom attribute to be assigned to pointers, like
  * `near` or `far`. In these cases, you can give Unity a safe default for these
@@ -249,5 +259,21 @@
  * TEST - PASS (10 ms)
  */
 /* #define UNITY_INCLUDE_EXEC_TIME */
+
+#include "../xcore/xhal_time.h"
+
+#define UNITY_INCLUDE_EXEC_TIME
+
+#define UNITY_TIME_TYPE         xhal_tick_t
+#define UNITY_EXEC_TIME_START() Unity.CurrentTestStartTime = xtime_get_tick_ms()
+#define UNITY_EXEC_TIME_STOP()  Unity.CurrentTestStopTime = xtime_get_tick_ms()
+#define UNITY_PRINT_EXEC_TIME()                                               \
+    {                                                                         \
+        UNITY_UINT execTimeMs =                                               \
+            TIME_DIFF(Unity.CurrentTestStopTime, Unity.CurrentTestStartTime); \
+        UnityPrint(" (");                                                     \
+        UnityPrintNumberUnsigned(execTimeMs);                                 \
+        UnityPrint(" ms)");                                                   \
+    }
 
 #endif /* UNITY_CONFIG_H */
