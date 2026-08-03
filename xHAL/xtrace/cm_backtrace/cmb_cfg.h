@@ -31,9 +31,8 @@
 
 #include "xhal_config.h"
 
-extern void cmb_printf(const char *format, ...);
-
 /* print line, must config by user */
+extern void cmb_printf(const char *format, ...);
 #define cmb_println(...)         \
     do                           \
     {                            \
@@ -41,20 +40,20 @@ extern void cmb_printf(const char *format, ...);
         cmb_printf("\r\n");      \
     } while (0)
 
-#ifndef XHAL_OS_SUPPORTING
-/* enable bare metal(no OS) platform */
-#define CMB_USING_BARE_METAL_PLATFORM
+#if (XHAL_OS_SUPPORTING == 0)
+    /* enable bare metal(no OS) platform */
+    #define CMB_USING_BARE_METAL_PLATFORM
 #else
-/* enable OS platform */
-#define CMB_USING_OS_PLATFORM
+    /* enable OS platform */
+    #define CMB_USING_OS_PLATFORM
+#endif
 
 /* OS platform type, must config when CMB_USING_OS_PLATFORM is enable */
-#define CMB_OS_PLATFORM_TYPE  XTRACE_OS_PLATFORM_TYPE
+#define CMB_OS_PLATFORM_TYPE  CMB_OS_PLATFORM_FREERTOS
 /* CMB_OS_PLATFORM_RTT or
- * CMB_OS_PLATFORM_UCOSII or CMB_OS_PLATFORM_UCOSIII or CMB_OS_PLATFORM_FREERTOS
- * or CMB_OS_PLATFORM_RTX5 or CMB_OS_PLATFORM_THREADX */
-
-#endif
+ * CMB_OS_PLATFORM_UCOSII or CMB_OS_PLATFORM_UCOSIII or
+ * CMB_OS_PLATFORM_FREERTOS or CMB_OS_PLATFORM_RTX5 or
+ * CMB_OS_PLATFORM_THREADX */
 
 /* cpu platform type, must config by user */
 #define CMB_CPU_PLATFORM_TYPE XTRACE_CPU_PLATFORM_TYPE

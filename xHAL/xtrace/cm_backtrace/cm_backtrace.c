@@ -107,11 +107,11 @@ enum {
 
 static const char * const print_info[] = {
 #if (CMB_PRINT_LANGUAGE == CMB_PRINT_LANGUAGE_ENGLISH)
-    #include "cmb_en_US.h"
+    #include "Languages/en-US/cmb_en_US.h"
 #elif (CMB_PRINT_LANGUAGE == CMB_PRINT_LANGUAGE_CHINESE)
-    #include "cmb_zh_CN.h"
+    #include "Languages/zh-CN/cmb_zh_CN.h"
 #elif (CMB_PRINT_LANGUAGE == CMB_PRINT_LANGUAGE_CHINESE_UTF8)
-    #include "cmb_zh_CN_UTF8.h"
+    #include "Languages/zh-CN/cmb_zh_CN_UTF8.h"
 #elif (CMB_PRINT_LANGUAGE == CMB_PRINT_LANGUAGE_CUSTOM)
     #include "cmb_language_custom.h"
 #else
@@ -723,4 +723,3 @@ void cm_backtrace_fault(uint32_t fault_handler_lr, uint32_t fault_handler_sp) {
 
     print_call_stack(stack_pointer);
 }
-
