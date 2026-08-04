@@ -3,8 +3,8 @@
 
 #include "xhal_config.h"
 
-#ifdef XHAL_OS_SUPPORTING
-#include "cmsis_os/cmsis_os2.h"
+#if (XHAL_OS_SUPPORTING == 1)
+    #include "cmsis_os/cmsis_os2.h"
 #endif
 
 #endif /* __XHAL_OS_H */
