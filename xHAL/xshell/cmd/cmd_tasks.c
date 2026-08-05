@@ -2,16 +2,17 @@
 #include "../../xos/xhal_os.h"
 #include "../xhal_shell.h"
 #include "cmd_config.h"
-#include XHAL_DEVICE_HEADER
+#include <string.h>
 
-#define TASK_LIST_LEN              32
+#define TASK_MAX_LIST_LEN          32
 #define OS_SUPPORT_THREAD_NAME     1
 #define OS_SUPPORT_THREAD_PRIORITY 1
 #define OS_SUPPORT_THREAD_STACK    0
 
-#define CMD_TASKS_DESCRIPTION      "tasks: list all registered threads\r\n"
+#define CMD_TASKS_DESCRIPTION      "tasks\r\nlist all registered threads"
 
-#if SHELL_CMD_IS_ENABLED(TASKS) && defined(XHAL_OS_SUPPORTING)
+#if SHELL_CMD_IS_ENABLED(TASKS) && (XHAL_OS_SUPPORTING == 1)
+
 static int tasks_cmd(int argc, char *argv[])
 {
     Shell *shell = shellGetCurrent();
@@ -19,8 +20,12 @@ static int tasks_cmd(int argc, char *argv[])
 
     if (argc > 1)
     {
-        shellPrint(shell, "usage:\r\n");
-        shellPrint(shell, CMD_TASKS_DESCRIPTION);
+        if (strcmp(argv[1], "-h") == 0)
+        {
+            shellPrint(shell, "%s", CMD_TASKS_DESCRIPTION);
+            return 0;
+        }
+        shellPrint(shell, "usage: %s", CMD_TASKS_DESCRIPTION);
         return -1;
     }
 
@@ -32,8 +37,8 @@ static int tasks_cmd(int argc, char *argv[])
         return 0;
     }
 
-    osThreadId_t thread_list[TASK_LIST_LEN];
-    uint32_t count = osThreadEnumerate(thread_list, TASK_LIST_LEN);
+    osThreadId_t thread_list[TASK_MAX_LIST_LEN];
+    uint32_t count = osThreadEnumerate(thread_list, TASK_MAX_LIST_LEN);
 
     shellPrint(shell, "Thread List (total: %lu)\r\n", count);
     shellPrint(
@@ -47,17 +52,21 @@ static int tasks_cmd(int argc, char *argv[])
     {
         osThreadState_t state = osThreadGetState(thread_list[i]);
         const char *name      = "Unnamed";
-#if OS_SUPPORT_THREAD_NAME
-        name = osThreadGetName(thread_list[i]);
-#endif
+    #if OS_SUPPORT_THREAD_NAME
+        const char *temp_name = osThreadGetName(thread_list[i]);
+        if (temp_name != NULL && temp_name[0] != '\0')
+        {
+            name = temp_name;
+        }
+    #endif
         int prio = 0;
-#if OS_SUPPORT_THREAD_PRIORITY
+    #if OS_SUPPORT_THREAD_PRIORITY
         prio = (int)osThreadGetPriority(thread_list[i]);
-#endif
+    #endif
         uint32_t stack_size = 0;
-#if OS_SUPPORT_THREAD_STACK
+    #if OS_SUPPORT_THREAD_STACK
         stack_size = osThreadGetStackSize(thread_list[i]);
-#endif
+    #endif
         const char *state_str = "UNKNOWN";
         switch (state)
         {
@@ -89,7 +98,7 @@ static int tasks_cmd(int argc, char *argv[])
                    stack_size);
     }
 
-    if (count >= TASK_LIST_LEN)
+    if (count >= TASK_MAX_LIST_LEN)
     {
         shellPrint(shell, "...\r\n");
     }
@@ -98,7 +107,6 @@ static int tasks_cmd(int argc, char *argv[])
 }
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
-                 tasks, tasks_cmd,
-                 "\r\nList all registered threads\r\n" CMD_TASKS_DESCRIPTION);
+                 tasks, tasks_cmd, list all registered threads);
 
 #endif /* SHELL_CMD_IS_ENABLED(TASKS) */

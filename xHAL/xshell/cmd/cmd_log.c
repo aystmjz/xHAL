@@ -117,9 +117,7 @@ static int log_cmd(int argc, char *argv[])
 
     if (argc > 3)
     {
-        shellPrint(shell, "usage:\r\n");
-        shellPrint(shell, CMD_LOG_USAGE);
-        shellPrint(shell, CMD_LOG_OPTIONS);
+        shellPrint(shell, "usage: %s%s", CMD_LOG_USAGE, CMD_LOG_OPTIONS);
         return -1;
     }
 
@@ -138,7 +136,12 @@ static int log_cmd(int argc, char *argv[])
     }
     else if (argc == 2)
     {
-        if (strcmp(argv[1], "-g") == 0)
+        if (strcmp(argv[1], "-h") == 0)
+        {
+            shellPrint(shell, "%s%s", CMD_LOG_USAGE, CMD_LOG_OPTIONS);
+            return 0;
+        }
+        else if (strcmp(argv[1], "-g") == 0)
         {
             get_level = 1;
         }
@@ -152,10 +155,7 @@ static int log_cmd(int argc, char *argv[])
         }
         else
         {
-            shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n");
-            shellPrint(shell, CMD_LOG_USAGE);
-            shellPrint(shell, CMD_LOG_OPTIONS);
+            shellPrint(shell, "usage: %s%s", CMD_LOG_USAGE, CMD_LOG_OPTIONS);
             return -1;
         }
     }
@@ -187,10 +187,7 @@ static int log_cmd(int argc, char *argv[])
         }
         else
         {
-            shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n");
-            shellPrint(shell, CMD_LOG_USAGE);
-            shellPrint(shell, CMD_LOG_OPTIONS);
+            shellPrint(shell, "usage: %s%s", CMD_LOG_USAGE, CMD_LOG_OPTIONS);
             return -1;
         }
     }
@@ -203,22 +200,22 @@ static int log_cmd(int argc, char *argv[])
         shellPrint(shell, "------|---------|------------------------\r\n");
         shellPrint(shell, "  %d   | %-7s | %s\r\n", 0, log_level_names[0],
                    "No logs");
-#if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_ERROR
+    #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_ERROR
         shellPrint(shell, "  %d   | %-7s | %s\r\n", 1, log_level_names[1],
                    "Errors only");
-#endif
-#if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_WARNING
+    #endif
+    #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_WARNING
         shellPrint(shell, "  %d   | %-7s | %s\r\n", 2, log_level_names[2],
                    "Warnings + Errors");
-#endif
-#if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_INFO
+    #endif
+    #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_INFO
         shellPrint(shell, "  %d   | %-7s | %s\r\n", 3, log_level_names[3],
                    "Info + Warnings + Errors");
-#endif
-#if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_DEBUG
+    #endif
+    #if XLOG_COMPILE_LEVEL >= XLOG_LEVEL_DEBUG
         shellPrint(shell, "  %d   | %-7s | %s\r\n", 4, log_level_names[4],
                    "All logs (Debug)");
-#endif
+    #endif
         shellPrint(shell, "----------------------------------------\r\n");
 
         shellPrint(shell, "\r\nAvailable time display modes:\r\n");
@@ -322,7 +319,6 @@ static int log_cmd(int argc, char *argv[])
 }
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
-                 log, log_cmd,
-                 "\r\nset/get log levels\r\n" CMD_LOG_USAGE CMD_LOG_OPTIONS);
+                 log, log_cmd, set/get log levels);
 
 #endif /* SHELL_CMD_IS_ENABLED(LOG) */

@@ -1,10 +1,12 @@
 #include "../../xcore/xhal_common.h"
 #include "../xhal_shell.h"
 #include "cmd_config.h"
+#include <string.h>
 
-#define CMD_VER_DESCRIPTION "ver: display system version information\r\n"
+#define CMD_VER_DESCRIPTION "ver\r\ndisplay system version information\r\n"
 
 #if SHELL_CMD_IS_ENABLED(VER)
+
 static int ver_cmd(int argc, char *argv[])
 {
     Shell *shell = shellGetCurrent();
@@ -12,8 +14,12 @@ static int ver_cmd(int argc, char *argv[])
 
     if (argc > 1)
     {
-        shellPrint(shell, "usage:\r\n");
-        shellPrint(shell, CMD_VER_DESCRIPTION);
+        if (strcmp(argv[1], "-h") == 0)
+        {
+            shellPrint(shell, "%s", CMD_VER_DESCRIPTION);
+            return 0;
+        }
+        shellPrint(shell, "usage: %s", CMD_VER_DESCRIPTION);
         return -1;
     }
 
@@ -30,8 +36,7 @@ static int ver_cmd(int argc, char *argv[])
     return 0;
 }
 
-SHELL_EXPORT_CMD(
-    SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), ver, ver_cmd,
-    "\r\ndisplay system version information\r\n" CMD_VER_DESCRIPTION);
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
+                 ver, ver_cmd, display system version information);
 
 #endif /* SHELL_CMD_IS_ENABLED(VER) */

@@ -217,10 +217,15 @@ static int dump_cmd(int argc, char *argv[])
     Shell *shell = shellGetCurrent();
     SHELL_ASSERT(shell, return -1);
 
+    if (argc == 2 && (strcmp(argv[1], "-h") == 0))
+    {
+        shellPrint(shell, "%s", CMD_DUMP_CDISCRIPTION);
+        return 0;
+    }
+
     if (argc < 3 || argc > 4)
     {
-        shellPrint(shell, "usage:\r\n");
-        shellPrint(shell, CMD_DUMP_CDISCRIPTION);
+        shellPrint(shell, "usage: %s", CMD_DUMP_CDISCRIPTION);
         return -1;
     }
 
@@ -240,7 +245,7 @@ static int dump_cmd(int argc, char *argv[])
         }
         else
         {
-            shellPrint(shell, "unknown parameter: %s\r\n", argv[3]);
+            shellPrint(shell, "usage: %s", CMD_DUMP_CDISCRIPTION);
             return -1;
         }
     }
@@ -259,5 +264,5 @@ static int dump_cmd(int argc, char *argv[])
 }
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
-                 dump, dump_cmd, "\r\ndump memory\r\n" CMD_DUMP_CDISCRIPTION);
+                 dump, dump_cmd, dump memory);
 #endif

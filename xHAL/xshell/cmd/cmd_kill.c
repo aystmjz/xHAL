@@ -9,7 +9,7 @@
 
 #define CMD_KILL_DESCRIPTION   "kill <thread_name> or kill 0x<handle>\r\n"
 
-#if SHELL_CMD_IS_ENABLED(KILL) && defined(XHAL_OS_SUPPORTING)
+#if SHELL_CMD_IS_ENABLED(KILL) && (XHAL_OS_SUPPORTING == 1)
 
 static const char *protected_threads[] = {
     "idle",     "main",      "tmr svc", "timer",   "timer service",
@@ -20,10 +20,15 @@ static int kill_cmd(int argc, char *argv[])
     Shell *shell = shellGetCurrent();
     SHELL_ASSERT(shell, return -1);
 
+    if (argc == 2 && (strcmp(argv[1], "-h") == 0))
+    {
+        shellPrint(shell, "%s", CMD_KILL_DESCRIPTION);
+        return 0;
+    }
+
     if (argc != 2)
     {
-        shellPrint(shell, "usage:\r\n");
-        shellPrint(shell, CMD_KILL_DESCRIPTION);
+        shellPrint(shell, "usage: %s", CMD_KILL_DESCRIPTION);
         return -1;
     }
 
@@ -52,10 +57,10 @@ static int kill_cmd(int argc, char *argv[])
 
     for (uint32_t i = 0; i < count; i++)
     {
-        const char *name = "Unnamed";
-#if OS_SUPPORT_THREAD_NAME
+        const char *name = NULL;
+    #if OS_SUPPORT_THREAD_NAME
         name = osThreadGetName(thread_list[i]);
-#endif
+    #endif
         if ((name != NULL && strcmp(name, target) == 0))
         {
             target_thread = thread_list[i];
@@ -77,9 +82,9 @@ static int kill_cmd(int argc, char *argv[])
 
     osThreadState_t state   = osThreadGetState(target_thread);
     const char *thread_name = "Unnamed";
-#if OS_SUPPORT_THREAD_NAME
+    #if OS_SUPPORT_THREAD_NAME
     thread_name = osThreadGetName(target_thread);
-#endif
+    #endif
 
     osThreadId_t current_thread = osThreadGetId();
 
@@ -117,9 +122,7 @@ static int kill_cmd(int argc, char *argv[])
     }
 }
 
-SHELL_EXPORT_CMD(
-    SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), kill,
-    kill_cmd,
-    "\r\nTerminate a thread by name or handle\r\n" CMD_KILL_DESCRIPTION);
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
+                 kill, kill_cmd, terminate a thread by name or handle);
 
 #endif /* SHELL_CMD_IS_ENABLED(KILL) */

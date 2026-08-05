@@ -12,6 +12,7 @@
     " -s: set current time with timestamp (Unix timestamp)\r\n"
 
 #if SHELL_CMD_IS_ENABLED(TIME)
+
 static int time_cmd(int argc, char *argv[])
 {
     Shell *shell = shellGetCurrent();
@@ -19,8 +20,7 @@ static int time_cmd(int argc, char *argv[])
 
     if (argc > 3)
     {
-        shellPrint(shell, "usage:\r\n");
-        shellPrint(shell, CMD_TIME_CDISCRIPTION);
+        shellPrint(shell, "usage: %s", CMD_TIME_CDISCRIPTION);
         return -1;
     }
 
@@ -35,8 +35,13 @@ static int time_cmd(int argc, char *argv[])
     }
     else if (argc == 2)
     {
+        if (strcmp(argv[1], "-h") == 0)
+        {
+            shellPrint(shell, "%s", CMD_TIME_CDISCRIPTION);
+            return 0;
+        }
         /* 一个参数：-u 或 -c */
-        if (strcmp(argv[1], "-u") == 0)
+        else if (strcmp(argv[1], "-u") == 0)
         {
             show_current_time = 0; /* 只显示 uptime */
         }
@@ -46,9 +51,7 @@ static int time_cmd(int argc, char *argv[])
         }
         else
         {
-            shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n");
-            shellPrint(shell, CMD_TIME_CDISCRIPTION);
+            shellPrint(shell, "usage: %s", CMD_TIME_CDISCRIPTION);
             return -1;
         }
     }
@@ -62,9 +65,7 @@ static int time_cmd(int argc, char *argv[])
         }
         else
         {
-            shellPrint(shell, "unknown parameter: %s\r\n", argv[1]);
-            shellPrint(shell, "usage:\r\n");
-            shellPrint(shell, CMD_TIME_CDISCRIPTION);
+            shellPrint(shell, "usage: %s", CMD_TIME_CDISCRIPTION);
             return -1;
         }
     }
@@ -145,5 +146,5 @@ static int time_cmd(int argc, char *argv[])
 }
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN),
-                 time, time_cmd, "\r\ntime command\r\n" CMD_TIME_CDISCRIPTION);
+                 time, time_cmd, time command);
 #endif
