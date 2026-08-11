@@ -3,8 +3,9 @@
 
 #include "xhal_config.h"
 #include "xhal_def.h"
-#include "xhal_std.h"
 #include <time.h>
+
+#define XTIME_INVALID_TS          (0)
 
 #define TIME_AFTER(a, b)          ((int32_t)((b) - (a)) < 0)
 #define TIME_BEFOR(a, b)          TIME_AFTER(b, a)
@@ -12,20 +13,21 @@
 #define TIME_BEFOR_EQ(a, b)       TIME_AFTER_EQ(b, a)
 #define TIME_DIFF(later, earlier) ((xhal_tick_t)((later) - (earlier)))
 
-#ifdef XHAL_OS_SUPPORTING
-#if (XOS_TICK_RATE_HZ == 0)
-#error "XOS_TICK_RATE_HZ must not be 0"
-#endif
+#if (XHAL_OS_SUPPORTING == 1)
+    #if (XOS_TICK_RATE_HZ == 0)
+        #error "XOS_TICK_RATE_HZ must not be 0"
+    #endif
 
-#if (1000 % XOS_TICK_RATE_HZ) != 0
-#warning \
-    "XOS_TICK_RATE_HZ does not evenly divide 1000, delay may lose precision, using 64-bit math"
-#endif
+    #if (1000 % XOS_TICK_RATE_HZ) != 0
+        #warning \
+            "XOS_TICK_RATE_HZ does not evenly divide 1000, delay may lose precision, using 64-bit math"
+    #endif
 
-#define XOS_MS_TO_TICKS(ms) \
-    ((xhal_tick_t)(((uint64_t)(ms) * (uint64_t)XOS_TICK_RATE_HZ) / 1000ULL))
-#define XOS_TICKS_TO_MS(ticks) \
-    ((xhal_tick_t)(((uint64_t)(ticks) * 1000ULL) / (uint64_t)XOS_TICK_RATE_HZ))
+    #define XOS_MS_TO_TICKS(ms) \
+        ((xhal_tick_t)(((uint64_t)(ms) * (uint64_t)XOS_TICK_RATE_HZ) / 1000ULL))
+    #define XOS_TICKS_TO_MS(ticks)                     \
+        ((xhal_tick_t)(((uint64_t)(ticks) * 1000ULL) / \
+                       (uint64_t)XOS_TICK_RATE_HZ))
 #endif
 
 typedef struct xhal_time

@@ -2,47 +2,37 @@
 #include "xhal_assert.h"
 #include "xhal_log.h"
 #include <stdio.h>
+#include XHAL_DEVICE_HEADER
 
-XLOG_TAG("xTime");
-
-#define XTIME_NOP()      __NOP()
-#define XTIME_INVALID_TS (0)
+XHAL_TAG(xTime);
 
 #ifndef XTIME_USE_DWT_DELAY
-#define XTIME_USE_DWT_DELAY (0)
-#endif
-
-#if XTIME_USE_DWT_DELAY == 0
-#include XHAL_DEVICE_HEADER
+    #define XTIME_USE_DWT_DELAY 0
 #endif
 
 #if XTIME_USE_DWT_DELAY != 0
-#include XHAL_DEVICE_HEADER
-
-#if !defined(DWT) || !defined(DWT_CTRL_CYCCNTENA_Msk)
-#error \
-    "DWT cycle counter is not available on this MCU, disable XTIME_USE_DWT_DELAY"
+    #if !defined(DWT) || !defined(DWT_CTRL_CYCCNTENA_Msk)
+        #error \
+            "DWT cycle counter is not available on this MCU, disable XTIME_USE_DWT_DELAY"
+    #endif
 #endif
 
+#ifndef XTIME_NOP
+    #error "Please define XTIME_NOP() macro in xhal_config.h"
 #endif
 
 #ifndef XTIME_AUTO_SYNC_ENABLE
-#define XTIME_AUTO_SYNC_ENABLE (1)
+    #define XTIME_AUTO_SYNC_ENABLE 1
 #endif
 
-#ifndef XTIME_AUTO_SYNC_TIME
-#define XTIME_AUTO_SYNC_TIME (60 * 60 * 60)
+#ifndef XHAL_CPU_FREQ_HZ
+    #error "Please define XHAL_CPU_FREQ_HZ"
 #endif
 
-#ifndef XTIME_CPU_FREQ_HZ
-#error "Please define XTIME_CPU_FREQ_HZ"
-#endif
+#if (XHAL_OS_SUPPORTING == 1)
+    #include "../xos/xhal_os.h"
 
-#ifdef XHAL_OS_SUPPORTING
-#include "../xos/xhal_os.h"
-
-static osMutexId_t _xtime_mutex(void);
-
+static osMutexId_t _get_xtime_mutex(void);
 static osMutexId_t xtime_mutex              = NULL;
 static const osMutexAttr_t xtime_mutex_attr = {
     .name      = "xtime_mutex",
@@ -55,6 +45,8 @@ static const osMutexAttr_t xtime_mutex_attr = {
 static volatile xhal_tick_t xtime_sys_tick_ms     = 0;
 static volatile xhal_uptime_t xtime_sys_uptime_ms = 0;
 
+static volatile uint32_t xtime_uptime_seq         = 0;
+
 static xhal_tick_t xtime_sync_tick_ms = 0;
 static xhal_ts_t xtime_base_ts        = XTIME_INVALID_TS;
 
@@ -65,7 +57,17 @@ xhal_tick_t xtime_get_tick_ms(void)
 
 xhal_uptime_t xtime_get_uptime_ms(void)
 {
-    return xtime_sys_uptime_ms;
+    uint32_t seq1, seq2;
+    xhal_uptime_t up;
+
+    do
+    {
+        seq1 = xtime_uptime_seq;    /* 进入临界读区 */
+        up   = xtime_sys_uptime_ms; /* 64 位非原子读取 */
+        seq2 = xtime_uptime_seq;    /* 退出临界读区 */
+    } while (((seq1 & 1U) != 0U) || (seq1 != seq2));
+
+    return up;
 }
 
 void xtime_delay_us(uint32_t delay_us)
@@ -83,7 +85,7 @@ void xtime_delay_us(uint32_t delay_us)
         initialized = 1;
     }
 
-    uint32_t clk   = (XTIME_CPU_FREQ_HZ / 1000000U);
+    uint32_t clk   = (XHAL_CPU_FREQ_HZ / 1000000U);
     uint32_t start = DWT->CYCCNT;
     uint32_t ticks = delay_us * clk;
 
@@ -91,7 +93,7 @@ void xtime_delay_us(uint32_t delay_us)
     {
     }
 #else
-    uint32_t count = delay_us * (XTIME_CPU_FREQ_HZ / 8U / 1000000U);
+    uint32_t count = delay_us * (XHAL_CPU_FREQ_HZ / 8U / 1000000U);
     while (count--)
     {
         XTIME_NOP();
@@ -106,7 +108,7 @@ void xtime_delay_ms(uint32_t delay_ms)
         return;
     }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osDelay(XOS_MS_TO_TICKS(delay_ms));
 #else
     xhal_tick_t start = xtime_get_tick_ms();
@@ -190,6 +192,11 @@ uint8_t xtime_days_in_month(uint16_t year, uint8_t month)
 {
     const uint8_t days_table[12] = {31, 28, 31, 30, 31, 30,
                                     31, 31, 30, 31, 30, 31};
+
+    if (month == 0 || month > 12)
+    {
+        return 0;
+    }
 
     if (month == 2 && _is_leap_year(year))
     {
@@ -340,11 +347,14 @@ xhal_err_t xtime_get_time(xhal_time_t *time)
  */
 xhal_ts_t xtime_get_ts(void)
 {
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xtime_mutex();
+    osMutexId_t mutex = _get_xtime_mutex();
     ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
+    if (ret_os != osOK)
+    {
+        return XTIME_INVALID_TS;
+    }
 #endif
     xhal_ts_t ts;
 
@@ -358,7 +368,7 @@ xhal_ts_t xtime_get_ts(void)
              (xhal_ts_t)(TIME_DIFF(xtime_sys_tick_ms, xtime_sync_tick_ms) /
                          1000);
     }
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
@@ -410,19 +420,23 @@ xhal_err_t xtime_sync_time(xhal_ts_t ts)
         return XHAL_ERR_INVALID;
     }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xtime_mutex();
+    osMutexId_t mutex = _get_xtime_mutex();
     ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
+    if (ret_os != osOK)
+    {
+        return (xhal_err_t)ret_os;
+    }
 #endif
 
     xtime_sync_tick_ms = xtime_sys_tick_ms;
     xtime_base_ts      = ts;
 
-    XLOG_INFO("RTC time resync completed, timestamp: %u", ts);
+    // XLOG_INFO("RTC time resync completed, timestamp: %lu", (unsigned
+    // long)ts);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
@@ -431,20 +445,47 @@ xhal_err_t xtime_sync_time(xhal_ts_t ts)
 
 /**
  * @brief  SysTick毫秒中断处理函数
+ *
+ * @note   OS 模式下，SysTick 中断周期为 1000/XOS_TICK_RATE_HZ ms，
+ *         并非固定 1ms，因此这里按实际周期累加毫秒计数；
+ *         非 OS 模式下 SysTick 固定配置为 1ms，仍按 1ms 累加。
  */
 void xtime_ms_tick_handler(void)
 {
-    xtime_sys_tick_ms++;
-    xtime_sys_uptime_ms++;
+    xhal_tick_t delta_ms;
+
+#if (XHAL_OS_SUPPORTING == 1)
+    /* OS 模式：每次中断对应 1000/XOS_TICK_RATE_HZ ms */
+    #if (1000 % XOS_TICK_RATE_HZ) == 0
+    /* tick 周期为整数毫秒，直接累加 */
+    delta_ms = (xhal_tick_t)(1000 / XOS_TICK_RATE_HZ);
+    #else
+    /* tick 周期不是整数毫秒：用余数累加保持长期精度。
+     * 每次中断向余数累加器加 1000，整除 TICK_RATE_HZ 得到本次应增毫秒数，
+     * 平均周期仍精确等于 1000/XOS_TICK_RATE_HZ ms。 */
+    static uint32_t remainder_ms = 0;
+    remainder_ms += 1000U;
+    delta_ms = (xhal_tick_t)(remainder_ms / (uint32_t)XOS_TICK_RATE_HZ);
+    remainder_ms %= (uint32_t)XOS_TICK_RATE_HZ;
+    #endif
+#else
+    /* 非 OS 模式：SysTick 固定为 1ms */
+    delta_ms = 1;
+#endif
+
+    xtime_sys_tick_ms += delta_ms;
+
+    xtime_uptime_seq++;
+    xtime_sys_uptime_ms += (xhal_uptime_t)delta_ms;
+    xtime_uptime_seq++;
 }
 
-#ifdef XHAL_OS_SUPPORTING
-static osMutexId_t _xtime_mutex(void)
+#if (XHAL_OS_SUPPORTING == 1)
+static osMutexId_t _get_xtime_mutex(void)
 {
     if (xtime_mutex == NULL)
     {
         xtime_mutex = osMutexNew(&xtime_mutex_attr);
-        xassert_not_null(xtime_mutex);
     }
 
     return xtime_mutex;
