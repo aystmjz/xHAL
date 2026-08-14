@@ -2,7 +2,7 @@
 #include "../xcore/xhal_assert.h"
 #include "../xcore/xhal_log.h"
 
-XLOG_TAG("xTim");
+XHAL_TAG(xTim);
 
 #define IS_XTIM_MODE(MODE)                                        \
     (((MODE) == XTIM_MODE_NORMAL) || ((MODE) == XTIM_MODE_PWM) || \
@@ -52,7 +52,7 @@ xhal_err_t xtim_inst(xhal_tim_t *self, const char *name,
     xassert_not_null(name);
     xassert_not_null(ops);
     xassert_not_null(config);
-    xassert_name(IS_XTIM_MODE(config->mode), name);
+    xassert_info(IS_XTIM_MODE(config->mode), name);
     xassert_ptr_struct_not_null(ops, name);
 
     switch (config->mode)
@@ -63,13 +63,13 @@ xhal_err_t xtim_inst(xhal_tim_t *self, const char *name,
         {
             if (config->setting.pwm.channel_mask & (1U << i))
             {
-                xassert_name(IS_XTIM_PWM_DUTY(
+                xassert_info(IS_XTIM_PWM_DUTY(
                                  config->setting.pwm.channels[i].duty_cycle),
                              name);
-                xassert_name(IS_XTIM_OC_POLARITY(
+                xassert_info(IS_XTIM_OC_POLARITY(
                                  config->setting.pwm.channels[i].polarity),
                              name);
-                xassert_name(
+                xassert_info(
                     IS_XTIM_OC_IDLE(config->setting.pwm.channels[i].idle_state),
                     name);
             }
@@ -77,15 +77,15 @@ xhal_err_t xtim_inst(xhal_tim_t *self, const char *name,
         break;
 
     case XTIM_MODE_ENCODER:
-        xassert_name(
+        xassert_info(
             IS_XTIM_IC_POLARITY(config->setting.encoder.channel1.polarity),
             name);
-        xassert_name(
+        xassert_info(
             IS_XTIM_IC_POLARITY(config->setting.encoder.channel2.polarity),
             name);
-        xassert_name(IS_XTIM_IC_FILTER(config->setting.encoder.channel1.filter),
+        xassert_info(IS_XTIM_IC_FILTER(config->setting.encoder.channel1.filter),
                      name);
-        xassert_name(IS_XTIM_IC_FILTER(config->setting.encoder.channel2.filter),
+        xassert_info(IS_XTIM_IC_FILTER(config->setting.encoder.channel2.filter),
                      name);
         break;
 
@@ -190,7 +190,7 @@ xhal_err_t xtim_set_count(xhal_periph_t *self, uint16_t count)
 xhal_err_t xtim_enable_irq(xhal_periph_t *self, xhal_tim_it_t it)
 {
     xassert_not_null(self);
-    xassert_name(IS_XTIM_IT(it), self->attr.name);
+    xassert_info(IS_XTIM_IT(it), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_TIM);
 
@@ -206,7 +206,7 @@ xhal_err_t xtim_enable_irq(xhal_periph_t *self, xhal_tim_it_t it)
 xhal_err_t xtim_disable_irq(xhal_periph_t *self, xhal_tim_it_t it)
 {
     xassert_not_null(self);
-    xassert_name(IS_XTIM_IT(it), self->attr.name);
+    xassert_info(IS_XTIM_IT(it), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_TIM);
 
@@ -301,7 +301,7 @@ xhal_err_t xtim_normal_set_compare(xhal_periph_t *self, uint8_t channel,
                                    uint16_t compare)
 {
     xassert_not_null(self);
-    xassert_name(IS_XTIM_CHANNEL(channel), self->attr.name);
+    xassert_info(IS_XTIM_CHANNEL(channel), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_TIM);
 
@@ -330,7 +330,7 @@ xhal_err_t xtim_pwm_set_duty_cycle(xhal_periph_t *self, uint8_t channel,
                                    uint16_t duty_cycle)
 {
     xassert_not_null(self);
-    xassert_name(IS_XTIM_CHANNEL(channel), self->attr.name);
+    xassert_info(IS_XTIM_CHANNEL(channel), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_TIM);
 
@@ -421,7 +421,7 @@ xhal_err_t xtim_pwm_set_prescaler(xhal_periph_t *self, uint16_t prescaler)
 xhal_err_t xtim_pwm_enable_channel(xhal_periph_t *self, uint8_t channel)
 {
     xassert_not_null(self);
-    xassert_name(IS_XTIM_CHANNEL(channel), self->attr.name);
+    xassert_info(IS_XTIM_CHANNEL(channel), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_TIM);
 
@@ -450,7 +450,7 @@ exit:
 xhal_err_t xtim_pwm_disable_channel(xhal_periph_t *self, uint8_t channel)
 {
     xassert_not_null(self);
-    xassert_name(IS_XTIM_CHANNEL(channel), self->attr.name);
+    xassert_info(IS_XTIM_CHANNEL(channel), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_TIM);
 

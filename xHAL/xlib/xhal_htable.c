@@ -3,7 +3,7 @@
 #include "../xcore/xhal_log.h"
 #include "../xcore/xhal_malloc.h"
 
-XLOG_TAG("xHashTable");
+XHAL_TAG(xHashTable);
 
 static uint32_t _get_prime_max(uint32_t capacity);
 static uint32_t _hash_time33(char *str);
@@ -113,9 +113,7 @@ xhal_err_t xhtable_add(xhal_htable_t *const self, char *name, void *data)
             }
         }
     }
-#ifdef XDEBUG
-    XLOG_ERROR("XHAL_ERR_FULL");
-#endif
+
     return XHAL_ERR_FULL;
 }
 
@@ -137,9 +135,7 @@ xhal_err_t xhtable_remove(xhal_htable_t *const self, char *name)
         self->table[ret].data = NULL;
         return XHAL_OK;
     }
-#ifdef XDEBUG
-    XLOG_ERROR("XHAL_ERROR");
-#endif
+
     return XHAL_ERROR;
 }
 
@@ -160,9 +156,7 @@ void *xhtable_get(xhal_htable_t *const self, char *name)
     {
         return self->table[ret].data;
     }
-#ifdef XDEBUG
-    XLOG_ERROR("XHAL_ERROR");
-#endif
+
     return NULL;
 }
 
@@ -221,9 +215,7 @@ int32_t xhtable_index(xhal_htable_t *const self, char *name)
             }
         }
     }
-#ifdef XDEBUG
-    XLOG_ERROR("XHAL_ERROR");
-#endif
+
     return (int32_t)XHAL_ERROR;
 }
 

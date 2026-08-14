@@ -72,7 +72,7 @@ typedef struct xhal_serial_data
     xrbuf_t tx_rbuf;
     xrbuf_t rx_rbuf;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     uint32_t rx_expect;
     osMutexId_t tx_mutex;
     osMutexId_t rx_mutex;

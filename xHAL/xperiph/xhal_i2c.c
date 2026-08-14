@@ -3,9 +3,9 @@
 #include "../xcore/xhal_log.h"
 #include "../xcore/xhal_time.h"
 
-XLOG_TAG("xI2C");
+XHAL_TAG(xI2C);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
 static const osEventFlagsAttr_t xi2c_event_flag_attr = {
     .name      = "xi2c_event_flag",
     .attr_bits = 0,
@@ -45,7 +45,7 @@ xhal_err_t xi2c_inst(xhal_i2c_t *self, const char *name,
     i2c->data.sda_name = sda_name;
     i2c->data.scl_name = scl_name;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     i2c->data.event_flag = osEventFlagsNew(&xi2c_event_flag_attr);
     xassert_not_null(i2c->data.event_flag);
 #endif
@@ -54,7 +54,7 @@ xhal_err_t xi2c_inst(xhal_i2c_t *self, const char *name,
     {
         xperiph_unregister(&i2c->peri);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         osEventFlagsDelete(i2c->data.event_flag);
 #endif
         return ret;
@@ -113,7 +113,7 @@ xhal_err_t xi2c_transfer(xhal_periph_t *self, xhal_i2c_msg_t *msgs,
             goto exit;
         }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         uint32_t wait_ms  = timeout_ms - elapsed_ms;
         osStatus_t ret_os = (osStatus_t)osEventFlagsWait(
             i2c->data.event_flag, XI2C_EVENT_DONE, osFlagsWaitAll,

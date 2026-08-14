@@ -63,7 +63,7 @@ typedef struct xhal_spi_data
 {
     xhal_spi_config_t config;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osEventFlagsId_t event_flag;
 #else
     volatile uint32_t event_flag;

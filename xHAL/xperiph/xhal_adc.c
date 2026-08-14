@@ -4,7 +4,7 @@
 #include "../xcore/xhal_time.h"
 #include <stdarg.h>
 
-XLOG_TAG("xADC");
+XHAL_TAG(xADC);
 
 #define IS_XADC_MODE(MODE) \
     (((MODE) == XADC_MODE_REALTIME) || ((MODE) == XADC_MODE_CONTINUOUS))
@@ -14,7 +14,7 @@ XLOG_TAG("xADC");
      ((RES) == XADC_RESOLUTION_12BIT) || ((RES) == XADC_RESOLUTION_14BIT) || \
      ((RES) == XADC_RESOLUTION_16BIT))
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
 static const osEventFlagsAttr_t xadc_event_flag_attr = {
     .name      = "xadc_event_flag",
     .attr_bits = 0,
@@ -34,9 +34,9 @@ xhal_err_t xadc_inst(xhal_adc_t *self, const char *name,
     xassert_not_null(config);
     xassert_not_null(data_buff);
     xassert_ptr_struct_not_null(ops, name);
-    xassert_name(IS_XADC_RESOLUTION(config->resolution), name);
-    xassert_name(channel_mask != 0, name);
-    xassert_name(config->reference_voltage > 0, name);
+    xassert_info(IS_XADC_RESOLUTION(config->resolution), name);
+    xassert_info(channel_mask != 0, name);
+    xassert_info(config->reference_voltage > 0, name);
 
     xhal_err_t ret                   = XHAL_OK;
     xhal_adc_t *adc                  = self;
@@ -58,7 +58,7 @@ xhal_err_t xadc_inst(xhal_adc_t *self, const char *name,
 
     xrbuf_init(&adc->data.data_rbuf, data_buff, data_bufsz);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     adc->data.event_flag = osEventFlagsNew(&xadc_event_flag_attr);
     xassert_not_null(adc->data.event_flag);
 #endif
@@ -68,7 +68,7 @@ xhal_err_t xadc_inst(xhal_adc_t *self, const char *name,
     {
         xperiph_unregister(&adc->peri);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         osEventFlagsDelete(adc->data.event_flag);
 #endif
         return ret;
@@ -146,7 +146,7 @@ uint32_t xadc_read_raw(xhal_periph_t *self, uint16_t samples,
         if (elapsed_ms >= timeout_ms)
             break;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         uint32_t wait_ms = timeout_ms - elapsed_ms;
         osEventFlagsWait(adc->data.event_flag, XADC_EVENT_DATA_READY,
                          osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
@@ -164,7 +164,7 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
 {
     xassert_not_null(self);
     xassert_not_null(buffer);
-    xassert_name(sizeof(float) == sizeof(uint32_t), "float size not support");
+    xassert_info(sizeof(float) == sizeof(uint32_t), "float size not support");
     XPERIPH_CHECK_INIT(self, 0);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_ADC);
 
@@ -228,7 +228,7 @@ uint32_t xadc_read_voltage(xhal_periph_t *self, uint16_t samples,
         if (elapsed_ms >= timeout_ms)
             break;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         uint32_t wait_ms = timeout_ms - elapsed_ms;
         osEventFlagsWait(adc->data.event_flag, XADC_EVENT_DATA_READY,
                          osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
@@ -324,8 +324,8 @@ xhal_err_t xadc_set_config(xhal_periph_t *self, xhal_adc_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
-    xassert_name(IS_XADC_RESOLUTION(config->resolution), self->attr.name);
-    xassert_name(config->reference_voltage > 0, self->attr.name);
+    xassert_info(IS_XADC_RESOLUTION(config->resolution), self->attr.name);
+    xassert_info(config->reference_voltage > 0, self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_ADC);
 
@@ -346,7 +346,7 @@ xhal_err_t xadc_set_config(xhal_periph_t *self, xhal_adc_config_t *config)
 xhal_err_t xadc_set_mode(xhal_periph_t *self, uint8_t mode)
 {
     xassert_not_null(self);
-    xassert_name(IS_XADC_MODE(mode), self->attr.name);
+    xassert_info(IS_XADC_MODE(mode), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_ADC);
 
@@ -367,7 +367,7 @@ xhal_err_t xadc_set_mode(xhal_periph_t *self, uint8_t mode)
 xhal_err_t xadc_set_reference_voltage(xhal_periph_t *self, float voltage)
 {
     xassert_not_null(self);
-    xassert_name(voltage > 0, self->attr.name);
+    xassert_info(voltage > 0, self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_ADC);
 

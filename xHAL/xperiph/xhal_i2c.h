@@ -44,7 +44,7 @@ typedef struct xhal_i2c_data
 {
     xhal_i2c_config_t config;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osEventFlagsId_t event_flag;
 #endif
     const char *i2c_name;

@@ -34,7 +34,7 @@ typedef struct xhal_periph
 {
     xhal_periph_attr_t attr;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osMutexId_t mutex;
 #endif
 
@@ -54,7 +54,7 @@ typedef struct xhal_periph
     } while (0)
 
 #define XPERIPH_CHECK_TYPE(_peri, _type) \
-    xassert_name(_peri->attr.type == _type, _peri->attr.name)
+    xassert_info(_peri->attr.type == _type, _peri->attr.name)
 
 xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr);
 xhal_err_t xperiph_unregister(xhal_periph_t *self);
@@ -63,7 +63,7 @@ xhal_periph_t *xperiph_find(const char *name);
 bool xperiph_valid(const char *name);
 bool xperiph_of_name(xhal_periph_t *self, const char *name);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
 void xperiph_mutex_control(xhal_periph_t *self, uint8_t status);
 /**
  * @brief 锁定设备以确保线程安全性。

@@ -2,7 +2,7 @@
 #include "../xcore/xhal_assert.h"
 #include "../xcore/xhal_log.h"
 
-XLOG_TAG("xExit");
+XHAL_TAG(xExit);
 
 #define IS_XEXIT_MODE(MODE) \
     (((MODE) == XEXIT_MODE_INTERRUPT) || ((MODE) == XEXIT_MODE_EVENT))
@@ -20,8 +20,8 @@ xhal_err_t xexit_inst(xhal_exit_t *self, const char *name,
     xassert_not_null(name);
     xassert_not_null(ops);
     xassert_not_null(config);
-    xassert_name(IS_XEXIT_MODE(config->mode), name);
-    xassert_name(IS_XEXIT_TRIGGER(config->trigger), name);
+    xassert_info(IS_XEXIT_MODE(config->mode), name);
+    xassert_info(IS_XEXIT_TRIGGER(config->trigger), name);
     xassert_ptr_struct_not_null(ops, name);
 
     xhal_err_t ret                 = XHAL_OK;
@@ -111,8 +111,8 @@ xhal_err_t xexit_set_config(xhal_periph_t *self, xhal_exit_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
-    xassert_name(IS_XEXIT_MODE(config->mode), self->attr.name);
-    xassert_name(IS_XEXIT_TRIGGER(config->trigger), self->attr.name);
+    xassert_info(IS_XEXIT_MODE(config->mode), self->attr.name);
+    xassert_info(IS_XEXIT_TRIGGER(config->trigger), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_EXIT);
 

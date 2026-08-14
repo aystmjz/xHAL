@@ -5,7 +5,7 @@
 #include "../xlib/xhal_bit.h"
 #include "xhal_pin.h"
 
-XLOG_TAG("xSPI");
+XHAL_TAG(xSPI);
 
 #define IS_XSPI_MODE(MOD)                                \
     (((MOD) == XSPI_MODE_0) || ((MOD) == XSPI_MODE_1) || \
@@ -19,7 +19,7 @@ XLOG_TAG("xSPI");
 #define IS_XSPI_DATA_BITS(BITS) \
     (((BITS) == XSPI_DATA_BITS_8) || ((BITS) == XSPI_DATA_BITS_16))
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
 static const osEventFlagsAttr_t xspi_event_flag_attr = {
     .name      = "xspi_event_flag",
     .attr_bits = 0,
@@ -38,9 +38,9 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
     xassert_not_null(spi_name);
     xassert_not_null(config);
     xassert_ptr_struct_not_null(ops, name);
-    xassert_name(IS_XSPI_MODE(config->mode), name);
-    xassert_name(IS_XSPI_DIRECTION(config->direction), name);
-    xassert_name(IS_XSPI_DATA_BITS(config->data_bits), name);
+    xassert_info(IS_XSPI_MODE(config->mode), name);
+    xassert_info(IS_XSPI_DIRECTION(config->direction), name);
+    xassert_info(IS_XSPI_DATA_BITS(config->data_bits), name);
 
     xhal_err_t ret                   = XHAL_OK;
     xhal_spi_t *spi                  = self;
@@ -62,7 +62,7 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
     spi->data.miso_name = miso_name;
     spi->data.mosi_name = mosi_name;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     spi->data.event_flag = osEventFlagsNew(&xspi_event_flag_attr);
     xassert_not_null(spi->data.event_flag);
 #else
@@ -73,7 +73,7 @@ xhal_err_t xspi_inst(xhal_spi_t *self, const char *name,
     {
         xperiph_unregister(&spi->peri);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         osEventFlagsDelete(spi->data.event_flag);
 #endif
         return ret;
@@ -142,7 +142,7 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
 
     for (uint32_t i = 0; i < num; i++)
     {
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         osEventFlagsClear(spi->data.event_flag, wait_flags);
 #else
         BITS_SET0(spi->data.event_flag, wait_flags);
@@ -153,7 +153,7 @@ xhal_err_t xspi_transfer(xhal_periph_t *self, xhal_spi_msg_t *msgs,
             goto exit;
         }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         uint32_t elapsed_ms = TIME_DIFF(xtime_get_tick_ms(), start_tick_ms);
         uint32_t wait_ms    = timeout_ms - elapsed_ms;
 
@@ -248,9 +248,9 @@ xhal_err_t xspi_set_config(xhal_periph_t *self, xhal_spi_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
-    xassert_name(IS_XSPI_MODE(config->mode), self->attr.name);
-    xassert_name(IS_XSPI_DIRECTION(config->direction), self->attr.name);
-    xassert_name(IS_XSPI_DATA_BITS(config->data_bits), self->attr.name);
+    xassert_info(IS_XSPI_MODE(config->mode), self->attr.name);
+    xassert_info(IS_XSPI_DIRECTION(config->direction), self->attr.name);
+    xassert_info(IS_XSPI_DATA_BITS(config->data_bits), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_SPI);
 
@@ -289,7 +289,7 @@ xhal_err_t xspi_set_direction(xhal_periph_t *self, uint8_t direction)
 {
 
     xassert_not_null(self);
-    xassert_name(IS_XSPI_DIRECTION(direction), self->attr.name);
+    xassert_info(IS_XSPI_DIRECTION(direction), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_SPI);
 
@@ -300,5 +300,5 @@ xhal_err_t xspi_set_direction(xhal_periph_t *self, uint8_t direction)
     xperiph_unlock(self);
     config.direction = direction;
 
-    return xspi_get_config(self, &config);
+    return xspi_set_config(self, &config);
 }

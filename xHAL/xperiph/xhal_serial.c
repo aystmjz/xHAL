@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-XLOG_TAG("xSerial");
+XHAL_TAG(xSerial);
 
 #define IS_XSERIAL_DATA_BITS(BITS) \
     (((BITS) == XSERIAL_DATA_BITS_8) || ((BITS) == XSERIAL_DATA_BITS_9))
@@ -18,7 +18,7 @@ XLOG_TAG("xSerial");
     (((PARITY) == XSERIAL_PARITY_NONE) || ((PARITY) == XSERIAL_PARITY_ODD) || \
      ((PARITY) == XSERIAL_PARITY_EVEN))
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
 static const osMutexAttr_t xserial_mutex_attr = {
     .name      = "xserial_mutex",
     .attr_bits = osMutexPrioInherit | osMutexRecursive,
@@ -43,9 +43,9 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
     xassert_not_null(serial_name);
     xassert_not_null(config);
     xassert_ptr_struct_not_null(ops, name);
-    xassert_name(IS_XSERIAL_DATA_BITS(config->data_bits), name);
-    xassert_name(IS_XSERIAL_STOP_BITS(config->stop_bits), name);
-    xassert_name(IS_XSERIAL_PARITY(config->parity), name);
+    xassert_info(IS_XSERIAL_DATA_BITS(config->data_bits), name);
+    xassert_info(IS_XSERIAL_STOP_BITS(config->stop_bits), name);
+    xassert_info(IS_XSERIAL_PARITY(config->parity), name);
 
     xhal_err_t ret                   = XHAL_OK;
     xhal_serial_t *serial            = self;
@@ -67,31 +67,48 @@ xhal_err_t xserial_inst(xhal_serial_t *self, const char *name,
     xrbuf_init(&serial->data.tx_rbuf, tx_buff, tx_bufsz);
     xrbuf_init(&serial->data.rx_rbuf, rx_buff, rx_bufsz);
 
-#ifdef XHAL_OS_SUPPORTING
-    serial->data.rx_expect = 1;
-    serial->data.tx_mutex  = osMutexNew(&xserial_mutex_attr);
-    xassert_not_null(serial->data.tx_mutex);
-    serial->data.rx_mutex = osMutexNew(&xserial_mutex_attr);
-    xassert_not_null(serial->data.rx_mutex);
+#if (XHAL_OS_SUPPORTING == 1)
+    serial->data.rx_expect  = 1;
+    serial->data.tx_mutex   = osMutexNew(&xserial_mutex_attr);
+    serial->data.rx_mutex   = osMutexNew(&xserial_mutex_attr);
     serial->data.event_flag = osEventFlagsNew(&xserial_event_flag_attr);
-    xassert_not_null(serial->data.event_flag);
+
+    if ((serial->data.tx_mutex == NULL) || (serial->data.rx_mutex == NULL) ||
+        (serial->data.event_flag == NULL))
+    {
+        ret = XHAL_ERR_NO_MEMORY;
+        goto fail;
+    }
 #endif
     ret = serial->ops->init(serial);
     if (ret != XHAL_OK)
     {
-        xperiph_unregister(&serial->peri);
-
-#ifdef XHAL_OS_SUPPORTING
-        osEventFlagsDelete(serial->data.event_flag);
-        osMutexDelete(serial->data.tx_mutex);
-        osMutexDelete(serial->data.rx_mutex);
-#endif
-        return ret;
+        goto fail;
     }
 
     serial->peri.is_inited = XPERIPH_INITED;
 
     return XHAL_OK;
+
+fail:
+    xperiph_unregister(&serial->peri);
+
+#if (XHAL_OS_SUPPORTING == 1)
+    if (serial->data.event_flag != NULL)
+    {
+        osEventFlagsDelete(serial->data.event_flag);
+    }
+    if (serial->data.tx_mutex != NULL)
+    {
+        osMutexDelete(serial->data.tx_mutex);
+    }
+    if (serial->data.rx_mutex != NULL)
+    {
+        osMutexDelete(serial->data.rx_mutex);
+    }
+#endif
+
+    return ret;
 }
 
 uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
@@ -109,7 +126,7 @@ uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
     xhal_tick_t start_tick_ms = xtime_get_tick_ms();
     uint32_t written          = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.tx_mutex, osWaitForever);
     xassert(ret_os == osOK);
@@ -127,14 +144,14 @@ uint32_t xserial_write(xhal_periph_t *self, const void *data, uint32_t size,
         if (elapsed_ms >= timeout_ms)
             break;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         uint32_t wait_ms = timeout_ms - elapsed_ms;
         osEventFlagsWait(serial->data.event_flag, XSERIAL_EVENT_CAN_WRITE,
                          osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
 #endif
     }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.tx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -155,7 +172,7 @@ uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
     xhal_tick_t start_tick_ms = xtime_get_tick_ms();
     uint32_t read             = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
@@ -173,14 +190,14 @@ uint32_t xserial_read(xhal_periph_t *self, void *buf, uint32_t size,
         if (elapsed_ms >= timeout_ms)
             break;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         uint32_t wait_ms = timeout_ms - elapsed_ms;
         osEventFlagsWait(serial->data.event_flag, XSERIAL_EVENT_CAN_READ,
                          osFlagsWaitAll, XOS_MS_TO_TICKS(wait_ms));
 #endif
     }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -201,14 +218,14 @@ uint32_t xserial_peek(xhal_periph_t *self, void *buff, uint32_t offset,
     xhal_serial_t *serial = XSERIAL_CAST(self);
     uint32_t peeked       = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
     peeked = xrbuf_peek(&serial->data.rx_rbuf, offset, buff, size);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -226,14 +243,14 @@ uint32_t xserial_discard(xhal_periph_t *self, uint32_t size)
     xhal_serial_t *serial = XSERIAL_CAST(self);
     uint32_t skipped      = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
     skipped = xrbuf_skip(&serial->data.rx_rbuf, size);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -254,14 +271,14 @@ uint8_t xserial_find(xhal_periph_t *self, const void *data, uint32_t size,
     xhal_serial_t *serial = XSERIAL_CAST(self);
     uint8_t found         = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
 #endif
     found = xrbuf_find(&serial->data.rx_rbuf, data, size, offset, index);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -277,7 +294,7 @@ xhal_err_t xserial_clear(xhal_periph_t *self)
     xhal_err_t ret        = XHAL_OK;
     xhal_serial_t *serial = XSERIAL_CAST(self);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
@@ -288,7 +305,7 @@ xhal_err_t xserial_clear(xhal_periph_t *self)
     {
         ret = XHAL_ERROR;
     }
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -338,7 +355,7 @@ uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...)
     xhal_serial_t *serial = XSERIAL_CAST(self);
     int32_t ret           = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
@@ -354,7 +371,7 @@ uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...)
         goto exit;
 
     read = xrbuf_read(&serial->data.rx_rbuf, buf, len);
-    xassert_name(read == len, self->attr.name);
+    xassert_info(read == len, self->attr.name);
 
     buf[len] = '\0';
 
@@ -367,7 +384,7 @@ uint32_t xserial_scanf(xhal_periph_t *self, const char *fmt, ...)
 
 exit:
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -426,7 +443,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
 
     xhal_serial_t *serial = XSERIAL_CAST(self);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
     ret_os            = osMutexAcquire(serial->data.rx_mutex, osWaitForever);
     xassert(ret_os == osOK);
@@ -434,7 +451,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
     status->rx_used = xrbuf_get_full(&serial->data.rx_rbuf);
     status->rx_free = xrbuf_get_free(&serial->data.rx_rbuf);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.rx_mutex);
     xassert(ret_os == osOK);
     ret_os = osMutexAcquire(serial->data.tx_mutex, osWaitForever);
@@ -443,7 +460,7 @@ xhal_err_t xserial_get_status(xhal_periph_t *self, xserial_status_t *status)
     status->tx_used = xrbuf_get_full(&serial->data.tx_rbuf);
     status->tx_free = xrbuf_get_free(&serial->data.tx_rbuf);
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(serial->data.tx_mutex);
     xassert(ret_os == osOK);
 #endif
@@ -470,9 +487,9 @@ xhal_err_t xserial_set_config(xhal_periph_t *self, xhal_serial_config_t *config)
 {
     xassert_not_null(self);
     xassert_not_null(config);
-    xassert_name(IS_XSERIAL_DATA_BITS(config->data_bits), self->attr.name);
-    xassert_name(IS_XSERIAL_STOP_BITS(config->stop_bits), self->attr.name);
-    xassert_name(IS_XSERIAL_PARITY(config->parity), self->attr.name);
+    xassert_info(IS_XSERIAL_DATA_BITS(config->data_bits), self->attr.name);
+    xassert_info(IS_XSERIAL_STOP_BITS(config->stop_bits), self->attr.name);
+    xassert_info(IS_XSERIAL_PARITY(config->parity), self->attr.name);
     XPERIPH_CHECK_INIT(self, XHAL_ERR_NO_INIT);
     XPERIPH_CHECK_TYPE(self, XHAL_PERIPH_UART);
 

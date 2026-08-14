@@ -4,17 +4,17 @@
 #include "../xcore/xhal_malloc.h"
 #include <string.h>
 
-XLOG_TAG("xPeriph");
+XHAL_TAG(xPeriph);
 
 #ifndef XHAL_PERI_NUM_MAX
-#define XHAL_PERI_NUM_MAX (64)
+    #define XHAL_PERI_NUM_MAX (64)
 #endif
 
 static xhal_periph_t *xperiph_table[XHAL_PERI_NUM_MAX];
 static uint16_t xperiph_count = 0;
 
-#ifdef XHAL_OS_SUPPORTING
-static osMutexId_t _xperiph_mutex(void);
+#if (XHAL_OS_SUPPORTING == 1)
+static osMutexId_t _get_xperiph_mutex(void);
 static osMutexId_t xperiph_mutex              = NULL;
 static const osMutexAttr_t xperiph_mutex_attr = {
     .name      = "xperiph_mutex",
@@ -34,24 +34,31 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
     xassert_not_null(self);
     xassert_not_null(attr);
     xassert_not_null(attr->name);
-    xassert_name(xperiph_find(attr->name) == NULL, attr->name);
+    xassert_info(xperiph_find(attr->name) == NULL, attr->name);
 
-    xhal_err_t ret = XHAL_OK;
+    xhal_err_t ret   = XHAL_OK;
+    uint8_t inserted = 0;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xperiph_mutex();
-    ret_os = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
+    osMutexId_t mutex = _get_xperiph_mutex();
+    ret_os            = osMutexAcquire(mutex, osWaitForever);
+    if (ret_os != osOK)
+    {
+        return (xhal_err_t)ret_os;
+    }
 
     self->mutex = osMutexNew(&xperiph_mutex_attr);
-    xassert_not_null(self->mutex);
+    if (self->mutex == NULL)
+    {
+        ret = XHAL_ERROR;
+        goto exit;
+    }
 #endif
 
     self->attr      = *attr;
     self->is_inited = XPERIPH_NOT_INITED;
 
-    uint8_t inserted = 0;
     for (uint16_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
     {
         if (xperiph_table[i] == NULL)
@@ -67,18 +74,21 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
     {
         ret = XHAL_ERR_NO_MEMORY;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
         ret_os = osMutexDelete(self->mutex);
-        xassert(ret_os == osOK);
+        if (ret_os != osOK)
+        {
+            ret = (xhal_err_t)ret_os;
+        }
         self->mutex = NULL;
 #endif
     }
 
-#ifdef XHAL_OS_SUPPORTING
+exit:
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
-
     return ret;
 }
 
@@ -92,19 +102,26 @@ xhal_err_t xperiph_unregister(xhal_periph_t *self)
 
     xhal_err_t ret = XHAL_ERROR;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _xperiph_mutex();
+    osMutexId_t mutex = _get_xperiph_mutex();
     ret_os            = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret_os == osOK);
+    if (ret_os != osOK)
+    {
+        return (xhal_err_t)ret_os;
+    }
 #endif
     for (uint16_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
     {
         if (xperiph_table[i] == self)
         {
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
             ret_os = osMutexDelete(self->mutex);
-            xassert(ret_os == osOK);
+            if (ret_os != osOK)
+            {
+                ret = (xhal_err_t)ret_os;
+                goto exit;
+            }
             self->mutex = NULL;
 #endif
             xperiph_table[i] = NULL;
@@ -114,7 +131,8 @@ xhal_err_t xperiph_unregister(xhal_periph_t *self)
         }
     }
 
-#ifdef XHAL_OS_SUPPORTING
+exit:
+#if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
@@ -129,17 +147,20 @@ uint16_t xperiph_get_number(void)
 {
     uint16_t num = 0;
 
-#ifdef XHAL_OS_SUPPORTING
-    osStatus_t ret    = osOK;
-    osMutexId_t mutex = _xperiph_mutex();
-    ret               = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret == osOK);
+#if (XHAL_OS_SUPPORTING == 1)
+    osStatus_t ret_os = osOK;
+    osMutexId_t mutex = _get_xperiph_mutex();
+    ret_os            = osMutexAcquire(mutex, osWaitForever);
+    if (ret_os != osOK)
+    {
+        return 0;
+    }
 #endif
     num = xperiph_count;
 
-#ifdef XHAL_OS_SUPPORTING
-    ret = osMutexRelease(mutex);
-    xassert(ret == osOK);
+#if (XHAL_OS_SUPPORTING == 1)
+    ret_os = osMutexRelease(mutex);
+    xassert(ret_os == osOK);
 #endif
     return num;
 }
@@ -153,16 +174,19 @@ xhal_periph_t *xperiph_find(const char *name)
 {
     xassert_not_null(name);
 
-#ifdef XHAL_OS_SUPPORTING
-    osStatus_t ret    = osOK;
-    osMutexId_t mutex = _xperiph_mutex();
-    ret               = osMutexAcquire(mutex, osWaitForever);
-    xassert(ret == osOK);
+#if (XHAL_OS_SUPPORTING == 1)
+    osStatus_t ret_os = osOK;
+    osMutexId_t mutex = _get_xperiph_mutex();
+    ret_os            = osMutexAcquire(mutex, osWaitForever);
+    if (ret_os != osOK)
+    {
+        return NULL;
+    }
 #endif
     xhal_periph_t *self = NULL;
     for (uint32_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
     {
-        if (xperiph_table[i] ? xperiph_table[i]->attr.name == NULL : NULL)
+        if (xperiph_table[i] == NULL || xperiph_table[i]->attr.name == NULL)
         {
             continue;
         }
@@ -174,9 +198,9 @@ xhal_periph_t *xperiph_find(const char *name)
         }
     }
 
-#ifdef XHAL_OS_SUPPORTING
-    ret = osMutexRelease(mutex);
-    xassert(ret == osOK);
+#if (XHAL_OS_SUPPORTING == 1)
+    ret_os = osMutexRelease(mutex);
+    xassert(ret_os == osOK);
 #endif
     return self;
 }
@@ -205,7 +229,7 @@ bool xperiph_of_name(xhal_periph_t *self, const char *name)
     bool ret = false;
 
     xperiph_lock(self);
-    if (self->attr.name ? strcmp(self->attr.name, name) == 0 : NULL)
+    if (self->attr.name != NULL && strcmp(self->attr.name, name) == 0)
     {
         ret = true;
     }
@@ -214,31 +238,30 @@ bool xperiph_of_name(xhal_periph_t *self, const char *name)
     return ret;
 }
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
 void xperiph_mutex_control(xhal_periph_t *self, uint8_t status)
 {
     xassert_not_null(self);
     xassert_not_null(self->mutex);
 
-    osStatus_t ret = osOK;
+    osStatus_t ret_os = osOK;
 
     if (status)
     {
-        ret = osMutexAcquire(self->mutex, osWaitForever);
+        ret_os = osMutexAcquire(self->mutex, osWaitForever);
     }
     else
     {
-        ret = osMutexRelease(self->mutex);
+        ret_os = osMutexRelease(self->mutex);
     }
-    xassert(ret == osOK);
+    xassert(ret_os == osOK);
 }
 
-static osMutexId_t _xperiph_mutex(void)
+static osMutexId_t _get_xperiph_mutex(void)
 {
     if (xperiph_mutex == NULL)
     {
         xperiph_mutex = osMutexNew(&xperiph_mutex_attr);
-        xassert_not_null(xperiph_mutex);
     }
 
     return xperiph_mutex;

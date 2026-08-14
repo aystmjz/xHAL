@@ -81,7 +81,7 @@ typedef struct xhal_adc_data
     uint32_t overflow_count;
     uint32_t sample_count;
 
-#ifdef XHAL_OS_SUPPORTING
+#if (XHAL_OS_SUPPORTING == 1)
     osEventFlagsId_t event_flag;
 #endif
     const char *name;
