@@ -4,16 +4,6 @@
 #include "xhal_config.h"
 #include "xhal_std.h"
 
-#ifndef XMALLOC_BLOCK_SIZE
-#define XMALLOC_BLOCK_SIZE (32)
-#endif
-
-#ifndef XMALLOC_MAX_SIZE
-#define XMALLOC_MAX_SIZE (15 * 1024)
-#endif
-
-#define XMALLOC_ALLOC_TABLE_SIZE (XMALLOC_MAX_SIZE / XMALLOC_BLOCK_SIZE)
-
 typedef struct xmem_pool
 {
     uint8_t *const membase;

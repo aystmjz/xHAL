@@ -4,17 +4,28 @@
 #include "xhal_export.h"
 #include "xhal_log.h"
 
-XLOG_TAG("xMalloc");
+XHAL_TAG(xMalloc);
 
-#ifdef XHAL_OS_SUPPORTING
-#include "../xos/xhal_os.h"
+#ifndef XMALLOC_BLOCK_SIZE
+    #define XMALLOC_BLOCK_SIZE (32)
+#endif
 
-#include "../xos/FreeRTOS/include/task.h"
-#define XMALLOC_ENTER_CRITICAL() vTaskSuspendAll()
-#define XMALLOC_EXIT_CRITICAL()  (void)xTaskResumeAll()
+#ifndef XMALLOC_MAX_SIZE
+    #define XMALLOC_MAX_SIZE (15 * 1024)
+#endif
+
+#define XMALLOC_ALLOC_TABLE_SIZE (XMALLOC_MAX_SIZE / XMALLOC_BLOCK_SIZE)
+
+#if (XHAL_OS_SUPPORTING == 1)
+    #include "../xos/xhal_os.h"
+
+    #include "../xos/FreeRTOS/include/FreeRTOS.h"
+    #include "../xos/FreeRTOS/include/task.h"
+    #define XMALLOC_ENTER_CRITICAL() vTaskSuspendAll()
+    #define XMALLOC_EXIT_CRITICAL()  (void)xTaskResumeAll()
 #else
-#define XMALLOC_ENTER_CRITICAL()
-#define XMALLOC_EXIT_CRITICAL()
+    #define XMALLOC_ENTER_CRITICAL()
+    #define XMALLOC_EXIT_CRITICAL()
 #endif
 
 static XHAL_USED XHAL_ALIGN(64) uint8_t xmem_internal_ram[XMALLOC_MAX_SIZE];
@@ -25,6 +36,9 @@ static xmem_pool_t xmem_pool = {
     .memmap  = xmem_internal_map,
     .memrdy  = 0,
 };
+
+static uint32_t _mem_malloc(uint32_t size);
+static uint8_t _mem_free(uint32_t offset);
 
 /**
  * @brief  复制内存
@@ -89,86 +103,6 @@ uint16_t xmem_perused(void)
 }
 
 /**
- * @brief  内存分配(内部调用)
- * @param  memx : 所属内存块
- * @param  size : 要分配的内存大小(字节)
- * @retval 内存偏移地址
- *   @arg  0 ~ 0XFFFFFFFE : 有效的内存偏移地址
- *   @arg  0XFFFFFFFF: 无效的内存偏移地址
- */
-static uint32_t my_mem_malloc(uint32_t size)
-{
-    signed long offset = 0;
-    uint32_t nmemb;     /* 需要的内存块数 */
-    uint32_t cmemb = 0; /* 连续空内存块数 */
-    uint32_t i;
-
-    if (!xmem_pool.memrdy) /* 未初始化,先执行初始化 */
-    {
-        uint8_t mttsize = sizeof(uint16_t); /* 获取memmap数组的类型长度*/
-        xmemset(xmem_pool.memmap, 0,
-                XMALLOC_ALLOC_TABLE_SIZE * mttsize); /* 内存状态表数据清零 */
-        xmem_pool.memrdy = 1; /* 内存管理初始化OK */
-    }
-
-    if (size == 0)
-    {
-        return 0xFFFFFFFF; /* 不需要分配 */
-    }
-
-    nmemb = size / XMALLOC_BLOCK_SIZE; /* 获取需要分配的连续内存块数 */
-    if (size % XMALLOC_BLOCK_SIZE)
-        nmemb++;
-
-    for (offset = XMALLOC_ALLOC_TABLE_SIZE - 1; offset >= 0;
-         offset--) /* 搜索整个内存控制区 */
-    {
-        if (!xmem_pool.memmap[offset])
-            cmemb++; /* 连续空内存块数增加 */
-        else
-            cmemb = 0; /* 连续内存块清零 */
-
-        if (cmemb == nmemb) /* 标注内存块非空 */
-        {
-            for (i = 0; i < nmemb; i++)
-                xmem_pool.memmap[offset + i] = nmemb;
-            return (offset * XMALLOC_BLOCK_SIZE); /* 返回偏移地址 */
-        }
-    }
-
-    return 0xFFFFFFFF; /* 未找到符合分配条件的内存块 */
-}
-
-/**
- * @brief  释放内存(内部调用)
- * @param  memx   : 所属内存块
- * @param  offset : 内存地址偏移
- * @retval 释放结果
- *   @arg  0, 释放成功;
- *   @arg  1, 释放失败;
- *   @arg  2, 超区域了(失败);
- */
-static uint8_t my_mem_free(uint32_t offset)
-{
-    if (!xmem_pool.memrdy) /* 未初始化 */
-    {
-        return 1;
-    } /* 未初始化 */
-
-    if (offset < XMALLOC_MAX_SIZE) /* 偏移在内存池内. */
-    {
-        int index = offset / XMALLOC_BLOCK_SIZE; /* 偏移所在内存块号码 */
-        int nmemb = xmem_pool.memmap[index];    /* 内存块数量 */
-
-        for (int i = 0; i < nmemb; i++) /* 内存块清零 */
-            xmem_pool.memmap[index + i] = 0;
-
-        return 0;
-    }
-    return 2; /* 偏移超区了. */
-}
-
-/**
  * @brief  释放内存(外部调用)
  * @param  memx : 所属内存块
  * @param  ptr  : 内存首地址
@@ -178,16 +112,13 @@ void xfree(void *ptr)
 {
     if (ptr == NULL)
     {
-#ifdef XDEBUG
-        XLOG_WARN("xfree NULL pointer");
-#endif
         return; /* 地址为0. */
     }
 
     uint32_t offset = (uint32_t)ptr - (uint32_t)xmem_pool.membase;
 
     XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
-    my_mem_free(offset);      /* 释放内存 */
+    _mem_free(offset);        /* 释放内存 */
     XMALLOC_EXIT_CRITICAL();  /* 离开临界区 */
 }
 /**
@@ -199,24 +130,19 @@ void xfree(void *ptr)
 void *xmalloc(uint32_t size)
 {
     void *ptr;
+    uint32_t offset;
 
     if (size == 0)
     {
-#ifdef XDEBUG
-        XLOG_WARN("xmalloc 0 size");
-#endif
         return NULL; /* 不需要分配 */
     }
 
     XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
-    uint32_t offset = my_mem_malloc(size);
+    offset = _mem_malloc(size);
     XMALLOC_EXIT_CRITICAL(); /* 离开临界区 */
 
     if (offset == 0xFFFFFFFF)
     {
-#ifdef XDEBUG
-        XLOG_ERROR("No memory");
-#endif
         ptr = NULL; /* 申请出错 */
     }
     else
@@ -269,7 +195,10 @@ void *xrealloc(void *ptr, uint32_t size)
 {
     xassert_not_null(ptr);
 
-    uint32_t offset = my_mem_malloc(size);
+    XMALLOC_ENTER_CRITICAL(); /* 进入临界区 */
+    uint32_t offset = _mem_malloc(size);
+    XMALLOC_EXIT_CRITICAL(); /* 离开临界区 */
+
     /* 申请出错 */
     if (offset == 0xFFFFFFFF)
         return NULL; /* 返回空(0) */
@@ -280,4 +209,84 @@ void *xrealloc(void *ptr, uint32_t size)
     xfree(ptr);                  /* 释放旧内存 */
 
     return new_ptr; /* 返回新内存首地址 */
+}
+
+/**
+ * @brief  内存分配(内部调用)
+ * @param  memx : 所属内存块
+ * @param  size : 要分配的内存大小(字节)
+ * @retval 内存偏移地址
+ *   @arg  0 ~ 0XFFFFFFFE : 有效的内存偏移地址
+ *   @arg  0XFFFFFFFF: 无效的内存偏移地址
+ */
+static uint32_t _mem_malloc(uint32_t size)
+{
+    signed long offset = 0;
+    uint32_t nmemb;     /* 需要的内存块数 */
+    uint32_t cmemb = 0; /* 连续空内存块数 */
+    uint32_t i;
+
+    if (!xmem_pool.memrdy) /* 未初始化,先执行初始化 */
+    {
+        uint8_t mttsize = sizeof(uint16_t); /* 获取memmap数组的类型长度*/
+        xmemset(xmem_pool.memmap, 0,
+                XMALLOC_ALLOC_TABLE_SIZE * mttsize); /* 内存状态表数据清零 */
+        xmem_pool.memrdy = 1; /* 内存管理初始化OK */
+    }
+
+    if (size == 0)
+    {
+        return 0xFFFFFFFF; /* 不需要分配 */
+    }
+
+    nmemb = size / XMALLOC_BLOCK_SIZE; /* 获取需要分配的连续内存块数 */
+    if (size % XMALLOC_BLOCK_SIZE)
+        nmemb++;
+
+    for (offset = XMALLOC_ALLOC_TABLE_SIZE - 1; offset >= 0;
+         offset--) /* 搜索整个内存控制区 */
+    {
+        if (!xmem_pool.memmap[offset])
+            cmemb++; /* 连续空内存块数增加 */
+        else
+            cmemb = 0; /* 连续内存块清零 */
+
+        if (cmemb == nmemb) /* 标注内存块非空 */
+        {
+            for (i = 0; i < nmemb; i++)
+                xmem_pool.memmap[offset + i] = nmemb;
+            return (offset * XMALLOC_BLOCK_SIZE); /* 返回偏移地址 */
+        }
+    }
+
+    return 0xFFFFFFFF; /* 未找到符合分配条件的内存块 */
+}
+
+/**
+ * @brief  释放内存(内部调用)
+ * @param  memx   : 所属内存块
+ * @param  offset : 内存地址偏移
+ * @retval 释放结果
+ *   @arg  0, 释放成功;
+ *   @arg  1, 释放失败;
+ *   @arg  2, 超区域了(失败);
+ */
+static uint8_t _mem_free(uint32_t offset)
+{
+    if (!xmem_pool.memrdy) /* 未初始化 */
+    {
+        return 1;
+    } /* 未初始化 */
+
+    if (offset < XMALLOC_MAX_SIZE) /* 偏移在内存池内. */
+    {
+        int index = offset / XMALLOC_BLOCK_SIZE; /* 偏移所在内存块号码 */
+        int nmemb = xmem_pool.memmap[index];     /* 内存块数量 */
+
+        for (int i = 0; i < nmemb; i++) /* 内存块清零 */
+            xmem_pool.memmap[index + i] = 0;
+
+        return 0;
+    }
+    return 2; /* 偏移超区了. */
 }
