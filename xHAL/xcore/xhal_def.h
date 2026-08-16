@@ -5,24 +5,27 @@
 
 #define XHAL_WAIT_FOREVER (0xFFFFFFFFU)
 
-#define XHAL_ERR_LIST                               \
-    ERR(XHAL_OK, 0, "Success")                      \
-    ERR(XHAL_ERROR, -1, "General error")            \
-    ERR(XHAL_ERR_EMPTY, -2, "Empty")                \
-    ERR(XHAL_ERR_FULL, -3, "Full")                  \
-    ERR(XHAL_ERR_TIMEOUT, -4, "Timeout")            \
-    ERR(XHAL_ERR_BUSY, -5, "Busy")                  \
-    ERR(XHAL_ERR_NO_MEMORY, -6, "No memory")        \
-    ERR(XHAL_ERR_IO, -7, "IO error")                \
-    ERR(XHAL_ERR_INVALID, -8, "Invalid argument")   \
-    ERR(XHAL_ERR_MEM_OVERLAY, -9, "Memory overlap") \
-    ERR(XHAL_ERR_MALLOC, -10, "Malloc failed")      \
-    ERR(XHAL_ERR_NOT_ENOUGH, -11, "Not enough")     \
-    ERR(XHAL_ERR_NO_INIT, -12, "Not initialized")   \
-    ERR(XHAL_ERR_BUS, -13, "Bus error")             \
-    ERR(XHAL_ERR_NOT_SUPPORT, -14, "Not supported") \
-    ERR(XHAL_ERR_NOT_FOUND, -15, "Not found")       \
-    ERR(XHAL_ERR_CRC, -16, "CRC error")
+#define XHAL_ERR_LIST                                    \
+    ERR(XHAL_OK, 0, "Success")                           \
+    ERR(XHAL_ERROR, -1, "General error")                 \
+    ERR(XHAL_ERR_TIMEOUT, -2, "Timeout")                 \
+    ERR(XHAL_ERR_RESOURCE, -3, "Resource not available") \
+    ERR(XHAL_ERR_INVALID, -4, "Invalid argument")        \
+    ERR(XHAL_ERR_NO_MEMORY, -5, "No memory")             \
+    ERR(XHAL_ERR_ISR, -6, "Not allowed in ISR context")  \
+    ERR(XHAL_ERR_EMPTY, -7, "Empty")                     \
+    ERR(XHAL_ERR_FULL, -8, "Full")                       \
+    ERR(XHAL_ERR_BUSY, -9, "Busy")                       \
+    ERR(XHAL_ERR_IO, -10, "IO error")                    \
+    ERR(XHAL_ERR_MEM_OVERLAY, -11, "Memory overlap")     \
+    ERR(XHAL_ERR_MALLOC, -12, "Malloc failed")           \
+    ERR(XHAL_ERR_NOT_ENOUGH, -13, "Not enough")          \
+    ERR(XHAL_ERR_NO_INIT, -14, "Not initialized")        \
+    ERR(XHAL_ERR_BUS, -15, "Bus error")                  \
+    ERR(XHAL_ERR_NOT_SUPPORT, -16, "Not supported")      \
+    ERR(XHAL_ERR_NOT_FOUND, -17, "Not found")            \
+    ERR(XHAL_ERR_CRC, -18, "CRC error")
+
 typedef enum xhal_err
 {
 #define ERR(code, value, str) code = value,
@@ -86,9 +89,9 @@ typedef enum xhal_err
     (((val) > (sub) + (min)) ? ((val) - (sub)) : (min))
 
 #if defined(__linux__)
-#define XHAL_STR_ENTER "\n"
+    #define XHAL_STR_ENTER "\n"
 #else
-#define XHAL_STR_ENTER "\r\n"
+    #define XHAL_STR_ENTER "\r\n"
 #endif
 
 /**
@@ -118,7 +121,7 @@ typedef int32_t xhal_offset_t;
 typedef uint32_t xhal_pointer_t;
 typedef uint32_t xhal_size_t;
 #else
-#error The currnet CPU is NOT supported!
+    #error The currnet CPU is NOT supported!
 #endif
 
 typedef uint32_t u32;
@@ -162,37 +165,39 @@ static inline const char *__basename(const char *path)
  */
 #define XHAL_XSTR(x)         XHAL_STR(x)
 
+#define XHAL_TAG(tag)        static const char __xhal_tag[] = #tag
+
 /* Compiler Related Definitions */
 #if defined(__CC_ARM) || defined(__CLANG_ARM) /* ARM Compiler */
 
-#include <stdarg.h>
-#define XHAL_SECTION(x) __attribute__((section(x)))
-#define XHAL_USED       __attribute__((used))
-#define XHAL_ALIGN(n)   __attribute__((aligned(n)))
-#define XHAL_WEAK       __attribute__((weak))
-#define xhal_inline     static __inline
+    #include <stdarg.h>
+    #define XHAL_SECTION(x) __attribute__((section(x)))
+    #define XHAL_USED       __attribute__((used))
+    #define XHAL_ALIGN(n)   __attribute__((aligned(n)))
+    #define XHAL_WEAK       __attribute__((weak))
+    #define xhal_inline     static __inline
 
 #elif defined(__IAR_SYSTEMS_ICC__) /* for IAR Compiler */
 
-#include <stdarg.h>
-#define XHAL_SECTION(x) @x
-#define XHAL_USED       __root
-#define XHAL_PRAGMA(x)  _Pragma(#x)
-#define XHAL_ALIGN(n)   XHAL_PRAGMA(data_alignment = n)
-#define XHAL_WEAK       __weak
-#define xhal_inline     static inline
+    #include <stdarg.h>
+    #define XHAL_SECTION(x) @x
+    #define XHAL_USED       __root
+    #define XHAL_PRAGMA(x)  _Pragma(#x)
+    #define XHAL_ALIGN(n)   XHAL_PRAGMA(data_alignment = n)
+    #define XHAL_WEAK       __weak
+    #define xhal_inline     static inline
 
 #elif defined(__GNUC__) /* GNU GCC Compiler */
 
-#include <stdarg.h>
-#define XHAL_SECTION(x) __attribute__((section(x)))
-#define XHAL_USED       __attribute__((used))
-#define XHAL_ALIGN(n)   __attribute__((aligned(n)))
-#define XHAL_WEAK       __attribute__((weak))
-#define xhal_inline     static inline
+    #include <stdarg.h>
+    #define XHAL_SECTION(x) __attribute__((section(x)))
+    #define XHAL_USED       __attribute__((used))
+    #define XHAL_ALIGN(n)   __attribute__((aligned(n)))
+    #define XHAL_WEAK       __attribute__((weak))
+    #define xhal_inline     static inline
 
 #else
-#error The current compiler is NOT supported!
+    #error The current compiler is NOT supported!
 #endif /* defined(__CC_ARM) || defined(__CLANG_ARM) */
 
 #endif /* __XHAL_DEF_H */

@@ -23,7 +23,7 @@ const char *xhal_err_to_str(xhal_err_t err)
     case code:                \
         return str " (" #value ")";
         XHAL_ERR_LIST
-#undef X
+#undef ERR
     default:
         return "Unknown error";
     }

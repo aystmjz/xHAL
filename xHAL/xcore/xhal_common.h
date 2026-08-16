@@ -13,13 +13,13 @@
      ((xhal_pointer_t)(addr) <= XHAL_VALID_FLASH_END))
 
 #define XHAL_VERSION_MAJOR 2
-#define XHAL_VERSION_MINOR 1
-#define XHAL_VERSION_PATCH 1
+#define XHAL_VERSION_MINOR 3
+#define XHAL_VERSION_PATCH 0
 #define XHAL_VERSION_HEX                                      \
     ((XHAL_VERSION_MAJOR << 16) | (XHAL_VERSION_MINOR << 8) | \
      (XHAL_VERSION_PATCH))
 
-#define XHAL_VERSION_STR "2.1.1"
+#define XHAL_VERSION_STR "2.3.0"
 
 #define XHAL_BUILD_DATE  __DATE__
 #define XHAL_BUILD_TIME  __TIME__
@@ -28,7 +28,6 @@ extern const char xhal_logo[];
 
 uint32_t xhal_version(void);
 const char *xhal_version_str(void);
-
 const char *xhal_err_to_str(xhal_err_t err);
 
 #endif /* __XHAL_COMMON_H */
