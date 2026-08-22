@@ -40,7 +40,7 @@ extern Shell *shell_get(void);
 
 #if (XHAL_OS_SUPPORTING == 1)
     #include "../xos/xhal_os.h"
-static osMutexId_t _get_xlog_mutex(void);
+osMutexId_t _get_xlog_mutex(void);
 static char xlog_buff[XLOG_BUFF_SIZE];
 static osMutexId_t xlog_mutex              = NULL;
 static const osMutexAttr_t xlog_mutex_attr = {
@@ -59,8 +59,8 @@ static const char xlog_level_lable[XLOG_LEVEL_MAX] = {
     ' ', 'E', 'W', 'I', 'D',
 };
 
-static uint8_t xlog_level    = XLOG_DEFAULT_LEVEL;
-static uint8_t xlog_time_mod = XLOG_DEFAULT_TIME_MODE;
+static volatile uint8_t xlog_level    = XLOG_DEFAULT_LEVEL;
+static volatile uint8_t xlog_time_mod = XLOG_DEFAULT_TIME_MODE;
 
 extern void xlog_output(char *data, uint32_t size);
 XHAL_WEAK void xlog_output(char *data, uint32_t size)
@@ -300,7 +300,7 @@ exit:
 }
 
 #if (XHAL_OS_SUPPORTING == 1)
-static osMutexId_t _get_xlog_mutex(void)
+osMutexId_t _get_xlog_mutex(void)
 {
     if (xlog_mutex == NULL)
     {

@@ -32,7 +32,7 @@ XHAL_TAG(xTime);
 #if (XHAL_OS_SUPPORTING == 1)
     #include "../xos/xhal_os.h"
 
-static osMutexId_t _get_xtime_mutex(void);
+osMutexId_t _get_xtime_mutex(void);
 static osMutexId_t xtime_mutex              = NULL;
 static const osMutexAttr_t xtime_mutex_attr = {
     .name      = "xtime_mutex",
@@ -45,7 +45,7 @@ static const osMutexAttr_t xtime_mutex_attr = {
 static volatile xhal_tick_t xtime_sys_tick_ms     = 0;
 static volatile xhal_uptime_t xtime_sys_uptime_ms = 0;
 
-static volatile uint32_t xtime_uptime_seq         = 0;
+static volatile uint32_t xtime_uptime_seq = 0;
 
 static xhal_tick_t xtime_sync_tick_ms = 0;
 static xhal_ts_t xtime_base_ts        = XTIME_INVALID_TS;
@@ -481,7 +481,7 @@ void xtime_ms_tick_handler(void)
 }
 
 #if (XHAL_OS_SUPPORTING == 1)
-static osMutexId_t _get_xtime_mutex(void)
+osMutexId_t _get_xtime_mutex(void)
 {
     if (xtime_mutex == NULL)
     {

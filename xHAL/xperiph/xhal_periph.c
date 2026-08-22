@@ -10,11 +10,13 @@ XHAL_TAG(xPeriph);
     #define XHAL_PERI_NUM_MAX (64)
 #endif
 
-static xhal_periph_t *xperiph_table[XHAL_PERI_NUM_MAX];
-static uint16_t xperiph_count = 0;
+static xhal_periph_t *volatile xperiph_table[XHAL_PERI_NUM_MAX];
+static volatile uint16_t xperiph_count = 0;
+
+static xhal_periph_t *_find_periph(const char *name);
 
 #if (XHAL_OS_SUPPORTING == 1)
-static osMutexId_t _get_xperiph_mutex(void);
+osMutexId_t _get_xperiph_mutex(void);
 static osMutexId_t xperiph_mutex              = NULL;
 static const osMutexAttr_t xperiph_mutex_attr = {
     .name      = "xperiph_mutex",
@@ -34,7 +36,6 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
     xassert_not_null(self);
     xassert_not_null(attr);
     xassert_not_null(attr->name);
-    xassert_info(xperiph_find(attr->name) == NULL, attr->name);
 
     xhal_err_t ret   = XHAL_OK;
     uint8_t inserted = 0;
@@ -56,6 +57,12 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
     }
 #endif
 
+    if (_find_periph(attr->name) != NULL)
+    {
+        ret = XHAL_ERR_EXIST;
+        goto exit;
+    }
+
     self->attr      = *attr;
     self->is_inited = XPERIPH_NOT_INITED;
 
@@ -73,34 +80,27 @@ xhal_err_t xperiph_register(xhal_periph_t *self, xhal_periph_attr_t *attr)
     if (!inserted)
     {
         ret = XHAL_ERR_NO_MEMORY;
-
-#if (XHAL_OS_SUPPORTING == 1)
-        ret_os = osMutexDelete(self->mutex);
-        if (ret_os != osOK)
-        {
-            ret = (xhal_err_t)ret_os;
-        }
-        self->mutex = NULL;
-#endif
     }
 
 exit:
 #if (XHAL_OS_SUPPORTING == 1)
+    if ((ret != XHAL_OK) && (self->mutex != NULL))
+    {
+        osMutexDelete(self->mutex);
+        self->mutex = NULL;
+    }
+
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
 #endif
     return ret;
 }
 
-/**
- * @brief This function unregisters a device with the device handle.
- * @param self   the pointer of device driver structure
- */
 xhal_err_t xperiph_unregister(xhal_periph_t *self)
 {
     xassert_not_null(self);
 
-    xhal_err_t ret = XHAL_ERROR;
+    xhal_err_t ret = XHAL_ERR_NOT_FOUND;
 
 #if (XHAL_OS_SUPPORTING == 1)
     osStatus_t ret_os = osOK;
@@ -116,12 +116,7 @@ xhal_err_t xperiph_unregister(xhal_periph_t *self)
         if (xperiph_table[i] == self)
         {
 #if (XHAL_OS_SUPPORTING == 1)
-            ret_os = osMutexDelete(self->mutex);
-            if (ret_os != osOK)
-            {
-                ret = (xhal_err_t)ret_os;
-                goto exit;
-            }
+            osMutexDelete(self->mutex);
             self->mutex = NULL;
 #endif
             xperiph_table[i] = NULL;
@@ -130,8 +125,6 @@ xhal_err_t xperiph_unregister(xhal_periph_t *self)
             break;
         }
     }
-
-exit:
 #if (XHAL_OS_SUPPORTING == 1)
     ret_os = osMutexRelease(mutex);
     xassert(ret_os == osOK);
@@ -139,70 +132,16 @@ exit:
     return ret;
 }
 
-/**
- * @brief Get the count number in device framework management.
- * @retval Count number of devices.
- */
 uint16_t xperiph_get_number(void)
 {
-    uint16_t num = 0;
-
-#if (XHAL_OS_SUPPORTING == 1)
-    osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _get_xperiph_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
-    if (ret_os != osOK)
-    {
-        return 0;
-    }
-#endif
-    num = xperiph_count;
-
-#if (XHAL_OS_SUPPORTING == 1)
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
-#endif
-    return num;
+    return xperiph_count;
 }
 
-/**
- * @brief 此函数根据指定名称查找设备驱动。
- * @param name    设备名称
- * @return 设备句柄。如果未找到，返回NULL
- */
 xhal_periph_t *xperiph_find(const char *name)
 {
     xassert_not_null(name);
 
-#if (XHAL_OS_SUPPORTING == 1)
-    osStatus_t ret_os = osOK;
-    osMutexId_t mutex = _get_xperiph_mutex();
-    ret_os            = osMutexAcquire(mutex, osWaitForever);
-    if (ret_os != osOK)
-    {
-        return NULL;
-    }
-#endif
-    xhal_periph_t *self = NULL;
-    for (uint32_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
-    {
-        if (xperiph_table[i] == NULL || xperiph_table[i]->attr.name == NULL)
-        {
-            continue;
-        }
-
-        if (strcmp(xperiph_table[i]->attr.name, name) == 0)
-        {
-            self = xperiph_table[i];
-            break;
-        }
-    }
-
-#if (XHAL_OS_SUPPORTING == 1)
-    ret_os = osMutexRelease(mutex);
-    xassert(ret_os == osOK);
-#endif
-    return self;
+    return _find_periph(name);
 }
 
 /**
@@ -238,6 +177,24 @@ bool xperiph_of_name(xhal_periph_t *self, const char *name)
     return ret;
 }
 
+static xhal_periph_t *_find_periph(const char *name)
+{
+    for (uint32_t i = 0; i < XHAL_PERI_NUM_MAX; i++)
+    {
+        if (xperiph_table[i] == NULL || xperiph_table[i]->attr.name == NULL)
+        {
+            continue;
+        }
+
+        if (strcmp(xperiph_table[i]->attr.name, name) == 0)
+        {
+            return xperiph_table[i];
+        }
+    }
+
+    return NULL;
+}
+
 #if (XHAL_OS_SUPPORTING == 1)
 void xperiph_mutex_control(xhal_periph_t *self, uint8_t status)
 {
@@ -257,7 +214,7 @@ void xperiph_mutex_control(xhal_periph_t *self, uint8_t status)
     xassert(ret_os == osOK);
 }
 
-static osMutexId_t _get_xperiph_mutex(void)
+osMutexId_t _get_xperiph_mutex(void)
 {
     if (xperiph_mutex == NULL)
     {

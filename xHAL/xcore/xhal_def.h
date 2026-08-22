@@ -24,7 +24,8 @@
     ERR(XHAL_ERR_BUS, -15, "Bus error")                  \
     ERR(XHAL_ERR_NOT_SUPPORT, -16, "Not supported")      \
     ERR(XHAL_ERR_NOT_FOUND, -17, "Not found")            \
-    ERR(XHAL_ERR_CRC, -18, "CRC error")
+    ERR(XHAL_ERR_CRC, -18, "CRC error")                  \
+    ERR(XHAL_ERR_EXIST, -19, "Already exist")
 
 typedef enum xhal_err
 {

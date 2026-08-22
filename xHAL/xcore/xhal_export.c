@@ -20,6 +20,11 @@ extern xhal_err_t shell_init(void);
 
 #if (XHAL_OS_SUPPORTING == 1)
     #include "../xos/xhal_os.h"
+    #include "../xperiph/xhal_periph.h"
+
+extern osMutexId_t _get_xperiph_mutex(void);
+extern osMutexId_t _get_xlog_mutex(void);
+extern osMutexId_t _get_xtime_mutex(void);
 static const osThreadAttr_t export_thread_attr = {
     .name       = "ThreadExport",
     .priority   = osPriorityRealtime,
@@ -87,6 +92,11 @@ void xhal_run(void)
 
 #if (XHAL_OS_SUPPORTING == 1)
     osKernelInitialize();
+
+    (void)_get_xtime_mutex();
+    (void)_get_xlog_mutex();
+    (void)_get_xperiph_mutex();
+
     osThreadNew(_export_thread, NULL, &export_thread_attr);
     osKernelStart();
 #else
@@ -122,7 +132,7 @@ void xhal_exit(void)
 
     for (int16_t level = xexport_exit_level_max; level >= 0; level--)
     {
-        _export_exit_func(level);  
+        _export_exit_func(level);
     }
 
     xhal_emerg_puts("Exit completed\r\n");
