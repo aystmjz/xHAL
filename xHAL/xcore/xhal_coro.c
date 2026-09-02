@@ -1,3 +1,17 @@
+/**
+ ******************************************************************************
+ * @file    xhal_coro.c
+ * @author  aystmjz
+ * @brief   协程模块源文件，实现协作式调度、事件机制及 CPU 占用统计
+ * @version 2.3.0
+ * @date    2026-08-23
+ ******************************************************************************
+ * Copyright (c) 2026 aystmjz. All rights reserved.
+ * SPDX-License-Identifier: MIT
+ ******************************************************************************
+ */
+
+/* Includes ------------------------------------------------------------------*/
 #include "xhal_coro.h"
 #include "xhal_assert.h"
 #include "xhal_log.h"
@@ -5,21 +19,29 @@
 #include "xhal_time.h"
 #include <string.h>
 
-XLOG_TAG("xCoro");
+XHAL_TAG(xCoro);
 
+/* Private defines -----------------------------------------------------------*/
 #ifndef XCORO_EVENT_NUM_MAX
-#define XCORO_EVENT_NUM_MAX (64)
+#define XCORO_EVENT_NUM_MAX (64) /* 最大事件数 */
 #endif
 
-static xhal_tick_t stat_window_start_ms;
-static xhal_tick_t stat_idle_total_ms;
+/* Private variables ---------------------------------------------------------*/
+static xhal_tick_t stat_window_start_ms; /* 统计窗口起始时间 */
+static xhal_tick_t stat_idle_total_ms;   /* 窗口内累计空闲时间 */
 
-static xhal_tick_t idle_enter_ms;
-static bool in_idle;
+static xhal_tick_t idle_enter_ms; /* 进入空闲状态时间 */
+static bool in_idle;              /* 是否处于空闲状态 */
 
-static xcoro_event_t *xcoro_event_table[XCORO_EVENT_NUM_MAX];
-static uint16_t xcoro_event_count = 0;
+static xcoro_event_t *xcoro_event_table[XCORO_EVENT_NUM_MAX]; /* 事件表 */
+static uint16_t xcoro_event_count = 0;                        /* 已注册事件数 */
 
+/* Exported functions --------------------------------------------------------*/
+/**
+ * @brief  初始化事件对象
+ * @param  event: 事件对象指针
+ * @retval 错误码
+ */
 xhal_err_t xcoro_event_init(xcoro_event_t *event)
 {
     xassert_not_null(event);
@@ -29,6 +51,11 @@ xhal_err_t xcoro_event_init(xcoro_event_t *event)
     return XHAL_OK;
 }
 
+/**
+ * @brief  注册事件到事件表
+ * @param  event: 事件对象指针
+ * @retval 错误码，表满时返回 XHAL_ERR_NO_MEMORY
+ */
 xhal_err_t xcoro_event_add(xcoro_event_t *event)
 {
     xassert_not_null(event);
@@ -55,6 +82,11 @@ xhal_err_t xcoro_event_add(xcoro_event_t *event)
     return XHAL_ERR_NO_MEMORY;
 }
 
+/**
+ * @brief  从事件表移除事件
+ * @param  event: 事件对象指针
+ * @retval 错误码，未找到时返回 XHAL_ERROR
+ */
 xhal_err_t xcoro_event_remove(xcoro_event_t *event)
 {
     xassert_not_null(event);
@@ -75,6 +107,11 @@ xhal_err_t xcoro_event_remove(xcoro_event_t *event)
     return ret;
 }
 
+/**
+ * @brief  按名称查找事件
+ * @param  name: 事件名称
+ * @retval 事件对象指针，未找到返回 NULL 并打印错误日志
+ */
 xcoro_event_t *xcoro_event_find(const char *name)
 {
     xassert_not_null(name);
@@ -82,7 +119,7 @@ xcoro_event_t *xcoro_event_find(const char *name)
     xcoro_event_t *event = NULL;
     for (uint16_t i = 0; i < XCORO_EVENT_NUM_MAX; i++)
     {
-        if (xcoro_event_table[i] ? xcoro_event_table[i]->name == NULL : NULL)
+        if (xcoro_event_table[i] == NULL || xcoro_event_table[i]->name == NULL)
         {
             continue;
         }
@@ -102,17 +139,28 @@ xcoro_event_t *xcoro_event_find(const char *name)
     return event;
 }
 
+/**
+ * @brief  校验事件名称是否存在
+ * @param  name: 事件名称
+ * @retval true 存在，false 不存在
+ */
 bool xcoro_event_valid(const char *name)
 {
     return xcoro_event_find(name) == NULL ? false : true;
 }
 
+/**
+ * @brief  校验事件对象名称是否匹配
+ * @param  event: 事件对象指针
+ * @param  name:  事件名称
+ * @retval true 匹配，false 不匹配
+ */
 bool xcoro_event_of_name(xcoro_event_t *event, const char *name)
 {
     xassert_not_null(event);
     xassert_not_null(name);
 
-    if (event->name ? strcmp(event->name, name) == 0 : NULL)
+    if (event->name != NULL && strcmp(event->name, name) == 0)
     {
         return true;
     }
@@ -120,6 +168,13 @@ bool xcoro_event_of_name(xcoro_event_t *event, const char *name)
     return false;
 }
 
+/* Private functions ---------------------------------------------------------*/
+/**
+ * @brief  按优先级插入就绪链表
+ * @note   更高优先级插入最前；同优先级先进先出；
+ *         更低优先级插入在第一个更低优先级节点之前
+ * @param  handle: 协程句柄
+ */
 static void _ready_list_insert(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
@@ -141,6 +196,12 @@ static void _ready_list_insert(xcoro_handle_t *handle)
     *pp          = handle;
 }
 
+/**
+ * @brief  按唤醒时间插入睡眠链表
+ * @note   更早唤醒插入最前；相同唤醒时间先进先出；
+ *         更晚唤醒插入在第一个更晚唤醒节点之前
+ * @param  handle: 协程句柄
+ */
 static void _sleep_list_insert(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
@@ -162,6 +223,10 @@ static void _sleep_list_insert(xcoro_handle_t *handle)
     *pp          = handle;
 }
 
+/**
+ * @brief  从睡眠链表查找并移除指定协程
+ * @param  handle: 协程句柄
+ */
 static void _sleep_list_find_remove(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
@@ -180,6 +245,10 @@ static void _sleep_list_find_remove(xcoro_handle_t *handle)
     }
 }
 
+/**
+ * @brief  从事件等待链表查找并移除指定协程
+ * @param  handle: 协程句柄
+ */
 static void _event_wait_list_find_remove(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
@@ -197,6 +266,12 @@ static void _event_wait_list_find_remove(xcoro_handle_t *handle)
         pp = &(*pp)->next;
     }
 }
+/**
+ * @brief  唤醒所有已到期的睡眠协程
+ * @note   遍历睡眠链表，将唤醒时间已到的协程移入就绪链表；
+ *         若协程同时在等待事件则解除等待并置超时结果
+ * @param  mgr: 协程管理器指针
+ */
 void _wake_expired_sleepers(xcoro_manager_t *mgr)
 {
     xhal_tick_t now = xtime_get_tick_ms();
@@ -227,6 +302,11 @@ void _wake_expired_sleepers(xcoro_manager_t *mgr)
     }
 }
 
+/**
+ * @brief  计算距离下一次唤醒所需的延时
+ * @param  mgr: 协程管理器指针
+ * @retval 延时毫秒数，无睡眠协程返回 0，已到期返回 1
+ */
 xhal_tick_t _next_wakeup_delay_ms(xcoro_manager_t *mgr)
 {
     if (mgr->sleep_list == NULL)
@@ -245,6 +325,11 @@ xhal_tick_t _next_wakeup_delay_ms(xcoro_manager_t *mgr)
     return TIME_DIFF(tick, now);
 }
 
+/**
+ * @brief  从就绪链表取出下一个待运行协程
+ * @param  mgr: 协程管理器指针
+ * @retval 协程句柄，链表为空返回 NULL
+ */
 xcoro_handle_t *_get_next_ready(xcoro_manager_t *mgr)
 {
     xcoro_handle_t *handle = mgr->ready_list;
@@ -257,11 +342,53 @@ xcoro_handle_t *_get_next_ready(xcoro_manager_t *mgr)
     return handle;
 }
 
-void xcoro_manager_init(xcoro_manager_t *mgr)
+/**
+ * @brief  初始化协程管理器
+ * @param  mgr: 协程管理器指针
+ * @retval 错误码
+ */
+xhal_err_t xcoro_manager_init(xcoro_manager_t *mgr)
 {
     xmemset(mgr, 0, sizeof(*mgr));
+
+    return XHAL_OK;
 }
 
+/**
+ * @brief  初始化协程句柄
+ * @param  entry:     协程入口函数
+ * @param  prio:      协程优先级
+ * @param  user_data: 用户数据指针
+ * @retval 错误码，优先级越界返回 XHAL_ERR_INVALID
+ */
+xhal_err_t xcoro_handle_init(xcoro_handle_t *handle, xcoro_entry_t entry,
+                             xcoro_priority_t prio, void *user_data)
+{
+    xassert_not_null(handle);
+    xassert_not_null(entry);
+
+    if (prio > XCORO_PRIO_MAX)
+    {
+        return XHAL_ERR_INVALID;
+    }
+
+    xmemset(handle, 0, sizeof(*handle));
+
+    handle->entry     = entry;
+    handle->prio      = prio;
+    handle->user_data = user_data;
+
+    return XHAL_OK;
+}
+
+/**
+ * @brief  注册协程到管理器
+ * @note   保存用户设置的属性后清空句柄并重新挂载，
+ *         使协程进入就绪态并插入就绪链表
+ * @param  mgr:    协程管理器指针
+ * @param  handle: 协程句柄
+ * @retval 错误码
+ */
 xhal_err_t xcoro_register(xcoro_manager_t *mgr, xcoro_handle_t *handle)
 {
     xassert_not_null(mgr);
@@ -286,6 +413,12 @@ xhal_err_t xcoro_register(xcoro_manager_t *mgr, xcoro_handle_t *handle)
     return XHAL_OK;
 }
 
+/**
+ * @brief  注销协程
+ * @note   先调用 xcoro_finish() 结束协程，再将其从管理器中移除
+ * @param  handle: 协程句柄
+ * @retval 错误码，未注册时返回 XHAL_ERR_INVALID
+ */
 xhal_err_t xcoro_unregister(xcoro_handle_t *handle)
 {
 
@@ -293,50 +426,34 @@ xhal_err_t xcoro_unregister(xcoro_handle_t *handle)
 
     if (handle->mgr == NULL)
     {
-        return XHAL_OK;
+        return XHAL_ERR_INVALID;
     }
 
-    xcoro_handle_t **pp;
-    pp = &handle->mgr->ready_list;
-    while (*pp)
-    {
-        if (*pp == handle)
-        {
-            *pp = handle->next;
-            break;
-        }
-        pp = &(*pp)->next;
-    }
-
-    if (handle->wakeup_tick_ms)
-    {
-        handle->wakeup_tick_ms = 0;
-        _sleep_list_find_remove(handle);
-    }
-
-    if (handle->waiting_event)
-    {
-        _event_wait_list_find_remove(handle);
-        handle->waiting_event = NULL;
-        handle->wait_result   = (uint32_t)XCORO_WAIT_CANCELED;
-        handle->wait_mask     = 0;
-        handle->wait_flags    = 0;
-    }
+    xcoro_finish(handle);
 
     handle->mgr->count--;
-
-    handle->mgr   = NULL;
-    handle->next  = NULL;
-    handle->state = XCORO_STATE_FINISHED;
+    handle->mgr  = NULL;
+    handle->next = NULL;
 
     return XHAL_OK;
 }
 
+/**
+ * @brief  判断协程是否仍在运行
+ * @param  handle: 协程句柄
+ * @retval true 运行中，false 已结束或句柄为空
+ */
 bool xcoro_is_running(xcoro_handle_t *handle)
 {
     return handle && (handle->state != XCORO_STATE_FINISHED);
 }
 
+/**
+ * @brief  协程睡眠指定时长
+ * @note   设置唤醒时间并挂入睡眠链表，调度器到期后自动唤醒
+ * @param  handle:   协程句柄
+ * @param  delay_ms: 睡眠毫秒数
+ */
 void xcoro_sleep(xcoro_handle_t *handle, xhal_tick_t delay_ms)
 {
     xassert_not_null(handle);
@@ -348,6 +465,11 @@ void xcoro_sleep(xcoro_handle_t *handle, xhal_tick_t delay_ms)
     _sleep_list_insert(handle);
 }
 
+/**
+ * @brief  协程睡眠到指定时刻
+ * @param  handle:  协程句柄
+ * @param  tick_ms: 绝对唤醒时刻
+ */
 void xcoro_sleep_until(xcoro_handle_t *handle, xhal_tick_t tick_ms)
 {
     xassert_not_null(handle);
@@ -359,6 +481,16 @@ void xcoro_sleep_until(xcoro_handle_t *handle, xhal_tick_t tick_ms)
     _sleep_list_insert(handle);
 }
 
+/**
+ * @brief  协程等待事件位
+ * @note   事件已满足条件时立即唤醒；否则挂入事件等待链表，
+ *         可按需设置超时(超时后返回 XCORO_WAIT_TIMEOUT)
+ * @param  handle:     协程句柄
+ * @param  event:      事件对象指针
+ * @param  mask:       等待的事件位掩码
+ * @param  flags:      等待标志(XCORO_FLAGS_WAIT_ALL/WAIT_NO_CLEAR)
+ * @param  timeout_ms: 超时毫秒数，XCORO_WAIT_FOREVER 为永久等待
+ */
 void xcoro_wait_event(xcoro_handle_t *handle, xcoro_event_t *event,
                       uint32_t mask, uint32_t flags, uint32_t timeout_ms)
 {
@@ -404,6 +536,13 @@ void xcoro_wait_event(xcoro_handle_t *handle, xcoro_event_t *event,
     }
 }
 
+/**
+ * @brief  设置事件位并唤醒满足条件的等待协程
+ * @note   对满足条件的等待者按标志自动清除事件位或保留，
+ *         未触发的等待者重新挂回等待链表
+ * @param  event: 事件对象指针
+ * @param  bits:  待设置的事件位
+ */
 void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
 {
     xassert_not_null(event);
@@ -460,6 +599,12 @@ void xcoro_set_event(xcoro_event_t *event, uint32_t bits)
     event->wait_list = remain_list;
 }
 
+/**
+ * @brief  清除事件位
+ * @param  event: 事件对象指针
+ * @param  bits:  待清除的事件位
+ * @retval 清除前的事件标志
+ */
 uint32_t xcoro_clear_event(xcoro_event_t *event, uint32_t bits)
 {
     xassert_not_null(event);
@@ -471,6 +616,10 @@ uint32_t xcoro_clear_event(xcoro_event_t *event, uint32_t bits)
     return old;
 }
 
+/**
+ * @brief  协程主动让出 CPU
+ * @param  handle: 协程句柄
+ */
 void xcoro_yield(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
@@ -479,38 +628,45 @@ void xcoro_yield(xcoro_handle_t *handle)
     _ready_list_insert(handle);
 }
 
-void xcoro_schedule(xcoro_handle_t *handle)
+/**
+ * @brief  重新调度已结束的协程
+ * @param  handle: 协程句柄
+ * @retval 错误码，协程未结束时返回 XHAL_ERR_INVALID
+ */
+xhal_err_t xcoro_schedule(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
     xassert_not_null(handle->mgr);
 
-    if (handle->wakeup_tick_ms)
+    if (handle->state != XCORO_STATE_FINISHED)
     {
-        handle->wakeup_tick_ms = 0;
-        _sleep_list_find_remove(handle);
-    }
-
-    if (handle->waiting_event)
-    {
-        _event_wait_list_find_remove(handle);
-        handle->waiting_event = NULL;
-        handle->wait_result   = (uint32_t)XCORO_WAIT_CANCELED;
-        handle->wait_mask     = 0;
-        handle->wait_flags    = 0;
+        return XHAL_ERR_INVALID;
     }
 
     handle->state = XCORO_STATE_READY;
     _ready_list_insert(handle);
+
+    return XHAL_OK;
 }
 
-void xcoro_finish(xcoro_handle_t *handle)
+/**
+ * @brief  结束协程
+ * @note   清空程序计数器，从就绪/睡眠/事件等待链表中移除，
+ *         置状态为已结束；等待事件时返回 XCORO_WAIT_CANCELED
+ * @param  handle: 协程句柄
+ * @retval 错误码
+ */
+xhal_err_t xcoro_finish(xcoro_handle_t *handle)
 {
     xassert_not_null(handle);
+    xassert_not_null(handle->mgr);
 
-    if (handle->mgr == NULL)
+    if (handle->state == XCORO_STATE_FINISHED)
     {
-        return;
+        return XHAL_OK;
     }
+
+    xmemset(handle->pc, 0, sizeof(handle->pc));
 
     xcoro_handle_t **pp;
     pp = &handle->mgr->ready_list;
@@ -540,13 +696,24 @@ void xcoro_finish(xcoro_handle_t *handle)
     }
 
     handle->state = XCORO_STATE_FINISHED;
+
+    return XHAL_OK;
 }
 
+/**
+ * @brief  请求关闭调度器
+ * @param  mgr: 协程管理器指针
+ */
 void xcoro_request_shutdown(xcoro_manager_t *mgr)
 {
     mgr->shutdown_req = true;
 }
 
+/**
+ * @brief  协程状态转字符串(内部接口)
+ * @param  state: 协程状态
+ * @retval 状态字符串
+ */
 static const char *_state_str(xcoro_state_t state)
 {
     switch (state)
@@ -564,6 +731,11 @@ static const char *_state_str(xcoro_state_t state)
     }
 }
 
+/**
+ * @brief  协程优先级转字符串(内部接口)
+ * @param  prio: 协程优先级
+ * @retval 优先级字符串
+ */
 static const char *_prio_str(xcoro_priority_t prio)
 {
     switch (prio)
@@ -583,77 +755,91 @@ static const char *_prio_str(xcoro_priority_t prio)
     }
 }
 
+/**
+ * @brief  打印单个协程句柄详情
+ * @note   输出入口、状态、优先级、程序计数器、用户数据及
+ *         睡眠/等待事件相关信息
+ * @param  handle: 协程句柄
+ */
 void xcoro_dump_handle(const xcoro_handle_t *handle)
 {
     if (handle == NULL)
     {
-        xlog_printf("xcoro: <null handle>\r\n");
+        XLOG_PRINTF("xcoro: <null handle>\r\n");
         return;
     }
 
-    xlog_printf("xcoro @%p\r\n", handle);
-    xlog_printf("  entry       : 0x%p\r\n", handle->entry);
-    xlog_printf("  state       : %s (%d)\r\n", _state_str(handle->state),
+    XLOG_PRINTF("xcoro @%p\r\n", handle);
+    XLOG_PRINTF("  entry       : 0x%p\r\n", handle->entry);
+    XLOG_PRINTF("  state       : %s (%d)\r\n", _state_str(handle->state),
                 handle->state);
-    xlog_printf("  prio        : %s (%d)\r\n", _prio_str(handle->prio),
+    XLOG_PRINTF("  prio        : %s (%d)\r\n", _prio_str(handle->prio),
                 handle->prio);
-    xlog_printf("  depth       : %u\r\n", handle->depth);
+    XLOG_PRINTF("  depth       : %u\r\n", handle->depth);
     for (uint32_t lvl = 0; lvl < XCORO_PC_MAX_LEVEL; lvl++)
     {
         uint32_t pc_lvl = (handle)->pc[lvl];
 
-        xlog_printf("  pc[%u] = %u%s\r\n", lvl, pc_lvl,
+        XLOG_PRINTF("  pc[%u] = %u%s\r\n", lvl, pc_lvl,
                     (lvl == handle->depth) ? " <active>" : "");
     }
-    xlog_printf("  user_data   : 0x%p\r\n", handle->user_data);
+    XLOG_PRINTF("  user_data   : 0x%p\r\n", handle->user_data);
 
     if (handle->state == XCORO_STATE_SLEEPING)
     {
-        xlog_printf("  wakeup_tick : %lu\r\n",
+        XLOG_PRINTF("  wakeup_tick : %lu\r\n",
                     (unsigned long)handle->wakeup_tick_ms);
     }
 
     if (handle->state == XCORO_STATE_WAITING)
     {
-        xlog_printf("  waiting_evt : %p (%s)\r\n", handle->waiting_event,
+        XLOG_PRINTF("  waiting_evt : %p (%s)\r\n", handle->waiting_event,
                     handle->waiting_event && handle->waiting_event->name
                         ? handle->waiting_event->name
                         : "noname");
-        xlog_printf("  wait_mask   : 0x%08lx\r\n", handle->wait_mask);
-        xlog_printf("  wait_flags  : 0x%08lx\r\n", handle->wait_flags);
-        xlog_printf("  wait_result : %ld\r\n", (long)handle->wait_result);
+        XLOG_PRINTF("  wait_mask   : 0x%08lx\r\n", handle->wait_mask);
+        XLOG_PRINTF("  wait_flags  : 0x%08lx\r\n", handle->wait_flags);
+        XLOG_PRINTF("  wait_result : %ld\r\n", (long)handle->wait_result);
     }
 }
 
+/**
+ * @brief  打印单个事件对象详情
+ * @param  evt: 事件对象指针
+ */
 void xcoro_dump_event(const xcoro_event_t *evt)
 {
     if (evt == NULL)
     {
-        xlog_printf("xcoro_event: <null>\r\n");
+        XLOG_PRINTF("xcoro_event: <null>\r\n");
         return;
     }
 
-    xlog_printf("xcoro_event @%p\r\n", evt);
-    xlog_printf("  name     : %s\r\n", evt->name ? evt->name : "noname");
-    xlog_printf("  flags    : 0x%08lx\r\n", evt->flags);
-    xlog_printf("  waitlist : %p\r\n", evt->wait_list);
+    XLOG_PRINTF("xcoro_event @%p\r\n", evt);
+    XLOG_PRINTF("  name     : %s\r\n", evt->name ? evt->name : "noname");
+    XLOG_PRINTF("  flags    : 0x%08lx\r\n", evt->flags);
+    XLOG_PRINTF("  waitlist : %p\r\n", evt->wait_list);
 }
 
+/**
+ * @brief  打印调度器全部就绪与睡眠协程
+ * @param  mgr: 协程管理器指针
+ */
 void xcoro_dump_all(const xcoro_manager_t *mgr)
 {
     if (mgr == NULL)
     {
-        xlog_printf("xcoro_mgr: <null>\r\n");
+        XLOG_PRINTF("xcoro_mgr: <null>\r\n");
         return;
     }
 
-    xlog_printf("========== xcoro manager dump begin ==========\r\n");
+    XLOG_PRINTF("========== xcoro manager dump begin ==========\r\n");
 
     /* READY list */
-    xlog_printf("[READY LIST]\r\n");
+    XLOG_PRINTF("[READY LIST]\r\n");
     if (mgr->ready_list == NULL)
     {
-        xlog_printf("  <empty>\r\n");
+        XLOG_PRINTF("  <empty>\r\n");
     }
     else
     {
@@ -666,10 +852,10 @@ void xcoro_dump_all(const xcoro_manager_t *mgr)
     }
 
     /* SLEEP list */
-    xlog_printf("[SLEEP LIST]\r\n");
+    XLOG_PRINTF("[SLEEP LIST]\r\n");
     if (mgr->sleep_list == NULL)
     {
-        xlog_printf("  <empty>\r\n");
+        XLOG_PRINTF("  <empty>\r\n");
     }
     else
     {
@@ -681,9 +867,12 @@ void xcoro_dump_all(const xcoro_manager_t *mgr)
         }
     }
 
-    xlog_printf("=========== xcoro manager dump end ===========\r\n");
+    XLOG_PRINTF("=========== xcoro manager dump end ===========\r\n");
 }
 
+/**
+ * @brief  初始化 CPU 占用率统计
+ */
 void xcoro_cpu_stat_init(void)
 {
     stat_window_start_ms = xtime_get_tick_ms();
@@ -692,6 +881,9 @@ void xcoro_cpu_stat_init(void)
     in_idle              = false;
 }
 
+/**
+ * @brief  记录协程开始运行时刻(退出空闲)
+ */
 void xcoro_cpu_stat_on_run(void)
 {
     if (in_idle)
@@ -702,6 +894,9 @@ void xcoro_cpu_stat_on_run(void)
     }
 }
 
+/**
+ * @brief  记录进入空闲时刻
+ */
 void xcoro_cpu_stat_on_idle(void)
 {
     if (!in_idle)
@@ -711,6 +906,12 @@ void xcoro_cpu_stat_on_idle(void)
     }
 }
 
+/**
+ * @brief  获取并重置 CPU 占用率
+ * @note   返回自上次调用以来的 CPU 占用率(0.01% 精度)，
+ *         计算后重置统计窗口
+ * @retval CPU 占用率，范围 0~10000
+ */
 uint16_t xcoro_cpu_usage_get(void)
 {
     xhal_tick_t now = xtime_get_tick_ms();
@@ -740,8 +941,17 @@ uint16_t xcoro_cpu_usage_get(void)
     return (uint16_t)usage;
 }
 
+/**
+ * @brief  运行协程调度器
+ * @note   循环处理到期睡眠协程、运行就绪协程；
+ *         无就绪协程时进入低功耗等待(tickless)，
+ *         直到事件中断或定时唤醒
+ * @param  mgr: 协程管理器指针
+ */
 void xcoro_scheduler_run(xcoro_manager_t *mgr)
 {
+    xcoro_cpu_stat_init();
+
     while (!mgr->shutdown_req)
     {
         /* ------------------------------------------------------------
@@ -753,15 +963,16 @@ void xcoro_scheduler_run(xcoro_manager_t *mgr)
          * 2. 若有 READY 协程，则立即运行调度
          * ------------------------------------------------------------ */
         xcoro_handle_t *handle = _get_next_ready(mgr);
-        if (handle)
+        if (handle && handle->entry)
         {
-            if (handle->entry)
-            {
-                handle->entry(handle);
-            }
+            xcoro_cpu_stat_on_run();
+            handle->entry(handle);
             continue;
         }
-
+        else
+        {
+            xcoro_cpu_stat_on_idle();
+        }
         /* ------------------------------------------------------------
          * 3. 若无 READY 协程 → 准备进入“tickless 低功耗”
          *    计算下一次需要唤醒的时间点（下一协程超时）
@@ -801,3 +1012,5 @@ void xcoro_scheduler_run(xcoro_manager_t *mgr)
         /* 3.2.3 中断返回后，若系统使用 tickless，需要在此校准系统 tick */
     }
 }
+
+/* ---------------------------------------------------------------------------*/

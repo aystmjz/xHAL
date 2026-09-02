@@ -1,35 +1,55 @@
+/**
+ ******************************************************************************
+ * @file    xhal_malloc.c
+ * @author  aystmjz
+ * @brief   内存管理模块源文件，实现基于块状分配的内存池及内存操作函数
+ * @version 2.3.0
+ * @date    2026-08-23
+ ******************************************************************************
+ * Copyright (c) 2026 aystmjz. All rights reserved.
+ * SPDX-License-Identifier: MIT
+ ******************************************************************************
+ */
+
+/* Includes ------------------------------------------------------------------*/
 #include "xhal_malloc.h"
 #include "xhal_assert.h"
 #include "xhal_def.h"
 #include "xhal_export.h"
 #include "xhal_log.h"
 
+#if (XHAL_OS_SUPPORTING == 1)
+    #include "../xos/FreeRTOS/include/FreeRTOS.h"
+    #include "../xos/FreeRTOS/include/task.h"
+    #include "../xos/xhal_os.h"
+#endif
+
 XHAL_TAG(xMalloc);
 
+/* Private defines -----------------------------------------------------------*/
 #ifndef XMALLOC_BLOCK_SIZE
-    #define XMALLOC_BLOCK_SIZE (32)
+    #define XMALLOC_BLOCK_SIZE (32) /* 内存块大小 */
 #endif
 
 #ifndef XMALLOC_MAX_SIZE
-    #define XMALLOC_MAX_SIZE (15 * 1024)
+    #define XMALLOC_MAX_SIZE (15 * 1024) /* 内存池总大小 */
 #endif
 
-#define XMALLOC_ALLOC_TABLE_SIZE (XMALLOC_MAX_SIZE / XMALLOC_BLOCK_SIZE)
+#define XMALLOC_ALLOC_TABLE_SIZE \
+    (XMALLOC_MAX_SIZE / XMALLOC_BLOCK_SIZE) /* 内存状态表项数 */
 
 #if (XHAL_OS_SUPPORTING == 1)
-    #include "../xos/xhal_os.h"
-
-    #include "../xos/FreeRTOS/include/FreeRTOS.h"
-    #include "../xos/FreeRTOS/include/task.h"
-    #define XMALLOC_ENTER_CRITICAL() vTaskSuspendAll()
-    #define XMALLOC_EXIT_CRITICAL()  (void)xTaskResumeAll()
+    #define XMALLOC_ENTER_CRITICAL() vTaskSuspendAll()      /* 进入临界区 */
+    #define XMALLOC_EXIT_CRITICAL()  (void)xTaskResumeAll() /* 退出临界区 */
 #else
     #define XMALLOC_ENTER_CRITICAL()
     #define XMALLOC_EXIT_CRITICAL()
 #endif
 
-static XHAL_USED XHAL_ALIGN(64) uint8_t xmem_internal_ram[XMALLOC_MAX_SIZE];
-static uint16_t xmem_internal_map[XMALLOC_ALLOC_TABLE_SIZE];
+/* Private variables ---------------------------------------------------------*/
+static XHAL_USED
+    XHAL_ALIGN(64) uint8_t xmem_internal_ram[XMALLOC_MAX_SIZE]; /* 内存池空间 */
+static uint16_t xmem_internal_map[XMALLOC_ALLOC_TABLE_SIZE];    /* 内存状态表 */
 
 static xmem_pool_t xmem_pool = {
     .membase = xmem_internal_ram,
@@ -37,14 +57,16 @@ static xmem_pool_t xmem_pool = {
     .memrdy  = 0,
 };
 
+/* Private function prototypes -----------------------------------------------*/
 static uint32_t _mem_malloc(uint32_t size);
 static uint8_t _mem_free(uint32_t offset);
 
+/* Exported functions --------------------------------------------------------*/
 /**
  * @brief  复制内存
- * @param  *des : 目的地址
- * @param  *src : 源地址
- * @param  n    : 需要复制的内存长度(字节为单位)
+ * @param  des: 目的地址
+ * @param  src: 源地址
+ * @param  n:   需要复制的内存长度(字节为单位)
  * @retval 无
  */
 void xmemcpy(void *des, const void *src, uint32_t n)
@@ -57,11 +79,12 @@ void xmemcpy(void *des, const void *src, uint32_t n)
     while (n--)
         *xdes++ = *xsrc++;
 }
+
 /**
  * @brief  设置内存值
- * @param  *s    : 内存首地址
- * @param  c: 要设置的值
- * @param  count : 需要设置的内存大小(字节为单位)
+ * @param  s:     内存首地址
+ * @param  c:     要设置的值
+ * @param  count: 需要设置的内存大小(字节为单位)
  * @retval 无
  */
 void xmemset(void *s, uint8_t c, uint32_t count)
@@ -73,6 +96,10 @@ void xmemset(void *s, uint8_t c, uint32_t count)
         *xs++ = c;
 }
 
+/**
+ * @brief  获取当前空闲内存大小
+ * @retval 空闲内存字节数
+ */
 uint32_t xmem_free_size(void)
 {
     uint32_t free_blocks = 0;
@@ -103,9 +130,8 @@ uint16_t xmem_perused(void)
 }
 
 /**
- * @brief  释放内存(外部调用)
- * @param  memx : 所属内存块
- * @param  ptr  : 内存首地址
+ * @brief  释放内存
+ * @param  ptr: 内存首地址
  * @retval 无
  */
 void xfree(void *ptr)
@@ -121,11 +147,11 @@ void xfree(void *ptr)
     _mem_free(offset);        /* 释放内存 */
     XMALLOC_EXIT_CRITICAL();  /* 离开临界区 */
 }
+
 /**
- * @brief  分配内存(外部调用)
- * @param  memx : 所属内存块
- * @param  size : 要分配的内存大小(字节)
- * @retval 分配到的内存首地址.
+ * @brief  分配内存
+ * @param  size: 要分配的内存大小(字节)
+ * @retval 分配到的内存首地址，失败返回 NULL
  */
 void *xmalloc(uint32_t size)
 {
@@ -169,8 +195,8 @@ void *xmalloc(uint32_t size)
 
 /**
  * @brief  分配并清零内存
- * @param  n    : 元素个数
- * @param  size : 单个元素大小(字节)
+ * @param  n:    元素个数
+ * @param  size: 单个元素大小(字节)
  * @retval 分配到的内存首地址，失败返回 NULL
  */
 void *xcalloc(uint32_t n, uint32_t size)
@@ -185,11 +211,10 @@ void *xcalloc(uint32_t n, uint32_t size)
 }
 
 /**
- * @brief  重新分配内存(外部调用)
- * @param  memx : 所属内存块
- * @param  *ptr : 旧内存首地址
- * @param  size : 要分配的内存大小(字节)
- * @retval 新分配到的内存首地址.
+ * @brief  重新分配内存
+ * @param  ptr:  旧内存首地址
+ * @param  size: 要分配的内存大小(字节)
+ * @retval 新分配到的内存首地址，失败返回 NULL
  */
 void *xrealloc(void *ptr, uint32_t size)
 {
@@ -211,12 +236,12 @@ void *xrealloc(void *ptr, uint32_t size)
     return new_ptr; /* 返回新内存首地址 */
 }
 
+/* Private functions ---------------------------------------------------------*/
 /**
  * @brief  内存分配(内部调用)
- * @param  memx : 所属内存块
- * @param  size : 要分配的内存大小(字节)
+ * @param  size: 要分配的内存大小(字节)
  * @retval 内存偏移地址
- *   @arg  0 ~ 0XFFFFFFFE : 有效的内存偏移地址
+ *   @arg  0 ~ 0XFFFFFFFE: 有效的内存偏移地址
  *   @arg  0XFFFFFFFF: 无效的内存偏移地址
  */
 static uint32_t _mem_malloc(uint32_t size)
@@ -231,7 +256,7 @@ static uint32_t _mem_malloc(uint32_t size)
         uint8_t mttsize = sizeof(uint16_t); /* 获取memmap数组的类型长度*/
         xmemset(xmem_pool.memmap, 0,
                 XMALLOC_ALLOC_TABLE_SIZE * mttsize); /* 内存状态表数据清零 */
-        xmem_pool.memrdy = 1; /* 内存管理初始化OK */
+        xmem_pool.memrdy = 1;                        /* 内存管理初始化OK */
     }
 
     if (size == 0)
@@ -264,12 +289,11 @@ static uint32_t _mem_malloc(uint32_t size)
 
 /**
  * @brief  释放内存(内部调用)
- * @param  memx   : 所属内存块
- * @param  offset : 内存地址偏移
+ * @param  offset: 内存地址偏移
  * @retval 释放结果
- *   @arg  0, 释放成功;
- *   @arg  1, 释放失败;
- *   @arg  2, 超区域了(失败);
+ *   @arg  0: 释放成功
+ *   @arg  1: 释放失败(未初始化)
+ *   @arg  2: 超区域了(失败)
  */
 static uint8_t _mem_free(uint32_t offset)
 {
@@ -290,3 +314,5 @@ static uint8_t _mem_free(uint32_t offset)
     }
     return 2; /* 偏移超区了. */
 }
+
+/* ---------------------------------------------------------------------------*/

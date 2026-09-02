@@ -1,3 +1,18 @@
+
+/**
+ ******************************************************************************
+ * @file    xhal_time.c
+ * @author  aystmjz
+ * @brief   时间模块源文件，实现毫秒/微秒延时、运行时间统计及时间戳转换
+ * @version 2.3.0
+ * @date    2026-08-23
+ ******************************************************************************
+ * Copyright (c) 2026 aystmjz. All rights reserved.
+ * SPDX-License-Identifier: MIT
+ ******************************************************************************
+ */
+
+/* Includes ------------------------------------------------------------------*/
 #include "xhal_time.h"
 #include "xhal_assert.h"
 #include "xhal_log.h"
@@ -6,8 +21,9 @@
 
 XHAL_TAG(xTime);
 
+/* Private defines -----------------------------------------------------------*/
 #ifndef XTIME_USE_DWT_DELAY
-    #define XTIME_USE_DWT_DELAY 0
+    #define XTIME_USE_DWT_DELAY 0 /* 是否使用 DWT 硬件延时 */
 #endif
 
 #if XTIME_USE_DWT_DELAY != 0
@@ -22,7 +38,7 @@ XHAL_TAG(xTime);
 #endif
 
 #ifndef XTIME_AUTO_SYNC_ENABLE
-    #define XTIME_AUTO_SYNC_ENABLE 1
+    #define XTIME_AUTO_SYNC_ENABLE 1 /* 自动同步使能 */
 #endif
 
 #ifndef XHAL_CPU_FREQ_HZ
@@ -42,19 +58,31 @@ static const osMutexAttr_t xtime_mutex_attr = {
 };
 #endif
 
-static volatile xhal_tick_t xtime_sys_tick_ms     = 0;
-static volatile xhal_uptime_t xtime_sys_uptime_ms = 0;
+/* Private variables ---------------------------------------------------------*/
+static volatile xhal_tick_t xtime_sys_tick_ms     = 0; /* 系统当前 tick 毫秒 */
+static volatile xhal_uptime_t xtime_sys_uptime_ms = 0; /* 系统运行总毫秒数 */
 
-static volatile uint32_t xtime_uptime_seq = 0;
+static volatile uint32_t xtime_uptime_seq = 0; /* 64 位运行时间读取序号 */
 
-static xhal_tick_t xtime_sync_tick_ms = 0;
-static xhal_ts_t xtime_base_ts        = XTIME_INVALID_TS;
+static xhal_tick_t xtime_sync_tick_ms = 0; /* 时间同步时记录的系统 tick */
+static xhal_ts_t xtime_base_ts        = XTIME_INVALID_TS; /* 时间基准时间戳 */
 
+/* Exported functions --------------------------------------------------------*/
+/**
+ * @brief  获取系统当前 tick 毫秒数
+ * @retval 系统 tick 毫秒数
+ */
 xhal_tick_t xtime_get_tick_ms(void)
 {
     return xtime_sys_tick_ms;
 }
 
+/**
+ * @brief  获取系统运行总毫秒数
+ * @note   使用序号计数保护 64 位变量的非原子读取，
+ *         避免读过程中发生中断更新导致数据撕裂
+ * @retval 系统运行总毫秒数
+ */
 xhal_uptime_t xtime_get_uptime_ms(void)
 {
     uint32_t seq1, seq2;
@@ -70,6 +98,11 @@ xhal_uptime_t xtime_get_uptime_ms(void)
     return up;
 }
 
+/**
+ * @brief  微秒级延时
+ * @note   使用 DWT 硬件定时器或 NOP 指令忙等实现
+ * @param  delay_us: 延时微秒数
+ */
 void xtime_delay_us(uint32_t delay_us)
 {
 #if XTIME_USE_DWT_DELAY
@@ -101,6 +134,11 @@ void xtime_delay_us(uint32_t delay_us)
 #endif
 }
 
+/**
+ * @brief  毫秒级延时
+ * @note   OS 模式下调用系统延时，非 OS 模式下忙等
+ * @param  delay_ms: 延时毫秒数
+ */
 void xtime_delay_ms(uint32_t delay_ms)
 {
     if (delay_ms == 0)
@@ -119,6 +157,11 @@ void xtime_delay_ms(uint32_t delay_ms)
 #endif
 }
 
+/**
+ * @brief  秒级延时
+ * @note   超过 UINT32_MAX 毫秒时分段调用 xtime_delay_ms()
+ * @param  delay_s: 延时秒数
+ */
 void xtime_delay_s(uint32_t delay_s)
 {
     if (delay_s == 0)
@@ -182,12 +225,24 @@ xhal_err_t xtime_get_format_uptime(char *time_str, uint32_t buff_len)
     return XHAL_OK;
 }
 
+/**
+ * @brief  判断是否为闰年(内部接口)
+ * @note   按公历闰年规则：四年一闰，百年不闰，四百年再闰
+ * @param  year: 年份
+ * @retval true 闰年，false 平年
+ */
 static inline bool _is_leap_year(uint16_t year)
 {
     /* 公历闰年规则 */
     return ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0));
 }
 
+/**
+ * @brief  获取指定月份的天数
+ * @param  year:  年份
+ * @param  month: 月份(1~12)
+ * @retval 该月天数，月份非法返回 0
+ */
 uint8_t xtime_days_in_month(uint16_t year, uint8_t month)
 {
     const uint8_t days_table[12] = {31, 28, 31, 30, 31, 30,
@@ -206,6 +261,13 @@ uint8_t xtime_days_in_month(uint16_t year, uint8_t month)
     return days_table[month - 1];
 }
 
+/**
+ * @brief  计算星期几(内部接口，Zeller 公式)
+ * @param  year:  年份
+ * @param  month: 月份
+ * @param  day:   日
+ * @retval 星期值，0=Sunday
+ */
 static inline uint8_t _calc_weekday(uint16_t year, uint8_t month, uint8_t day)
 {
     if (month < 3)
@@ -223,6 +285,11 @@ static inline uint8_t _calc_weekday(uint16_t year, uint8_t month, uint8_t day)
     return (uint8_t)((h + 6) % 7);
 }
 
+/**
+ * @brief  校验时间合法性
+ * @param  time: 时间结构体指针
+ * @retval true 合法，false 非法
+ */
 bool xtime_is_valid_time(const xhal_time_t *time)
 {
     if (time->hour > 23)
@@ -234,6 +301,12 @@ bool xtime_is_valid_time(const xhal_time_t *time)
     return true;
 }
 
+/**
+ * @brief  校验日期合法性
+ * @note   年份限制在 1970~2099，月份天数按闰年规则校验
+ * @param  time: 时间结构体指针
+ * @retval true 合法，false 非法
+ */
 bool xtime_is_valid_date(const xhal_time_t *time)
 {
     if (time == NULL)
@@ -260,6 +333,11 @@ bool xtime_is_valid_date(const xhal_time_t *time)
     return true;
 }
 
+/**
+ * @brief  计算并填充星期字段
+ * @param  time: 时间结构体指针
+ * @retval 错误码，日期非法返回 XHAL_ERR_INVALID
+ */
 xhal_err_t xtime_adjust_weekday(xhal_time_t *time)
 {
     xassert_not_null(time);
@@ -274,6 +352,12 @@ xhal_err_t xtime_adjust_weekday(xhal_time_t *time)
     return XHAL_OK;
 }
 
+/**
+ * @brief  时间戳转换为本地时间结构
+ * @param  ts:   时间戳
+ * @param  time: 输出的时间结构体指针
+ * @retval 错误码
+ */
 xhal_err_t xtime_timestamp_to_time(xhal_ts_t ts, xhal_time_t *time)
 {
     xassert_not_null(time);
@@ -296,6 +380,13 @@ xhal_err_t xtime_timestamp_to_time(xhal_ts_t ts, xhal_time_t *time)
     return XHAL_OK;
 }
 
+/**
+ * @brief  时间结构转换为时间戳
+ * @note   转换成功后同步更新 time 的星期字段
+ * @param  time: 时间结构体指针
+ * @param  ts:   输出的时间戳指针
+ * @retval 错误码，日期或时间非法返回 XHAL_ERR_INVALID
+ */
 xhal_err_t xtime_time_to_timestamp(xhal_time_t *time, xhal_ts_t *ts)
 {
     xassert_not_null(time);
@@ -327,6 +418,11 @@ xhal_err_t xtime_time_to_timestamp(xhal_time_t *time, xhal_ts_t *ts)
     return XHAL_OK;
 }
 
+/**
+ * @brief  获取当前本地时间结构
+ * @param  time: 输出的时间结构体指针
+ * @retval 错误码，未设置基准时间返回 XHAL_ERR_NO_INIT
+ */
 xhal_err_t xtime_get_time(xhal_time_t *time)
 {
     xassert_not_null(time);
@@ -411,7 +507,8 @@ xhal_err_t xtime_get_format_time(char *time_str, uint32_t buff_len)
 
 /**
  * @brief  同步时间
- * @retval 错误码
+ * @param  ts: 待设置的时间戳
+ * @retval 错误码，时间戳无效返回 XHAL_ERR_INVALID
  */
 xhal_err_t xtime_sync_time(xhal_ts_t ts)
 {
@@ -480,7 +577,12 @@ void xtime_ms_tick_handler(void)
     xtime_uptime_seq++;
 }
 
+/* Private functions ---------------------------------------------------------*/
 #if (XHAL_OS_SUPPORTING == 1)
+/**
+ * @brief  获取时间互斥锁，未创建时自动创建(内部接口)
+ * @retval 时间互斥锁句柄
+ */
 osMutexId_t _get_xtime_mutex(void)
 {
     if (xtime_mutex == NULL)
@@ -491,3 +593,5 @@ osMutexId_t _get_xtime_mutex(void)
     return xtime_mutex;
 }
 #endif
+
+/* ---------------------------------------------------------------------------*/
